@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-20.3</title>
+<title>轻量数据库 · v2026-10-20.4</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -932,7 +932,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-20.3">v2026-10-20.3</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-20.4">v2026-10-20.4</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -5172,7 +5172,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-20.3</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-20.4</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -6207,9 +6207,15 @@ function openFormatPanel(tableId, rowId, fieldId){
   //    渲染时永远取不到 → 用户看到的就是"当前行能生效，整列和当前单元格设了没反应" ✗
   //    （真机 2026-10-20 反馈）。这里兜底到第一个可见字段，并在面板里给出「列」下拉让人自己改 ✓
   if(!fieldId){
-    const vf = t.fields.filter(f=>f.hidden !== true);
-    fieldId = ((vf[0] || t.fields[0] || {}).id) || '';
+    // 先试"这张表上次格式化用的列"，再退到第一个可见列。
+    // 长按落在序号列（td.no-cell，没有 data-fid）时，用户想改哪一列是**猜不出来**的，
+    // 所以记住上次的选择，比每次都退回第一列好用得多 ✓
+    let saved = '';
+    try{ saved = localStorage.getItem('lighter-db-fmt-col:' + tableId) || ''; }catch(e){}
+    if(saved && t.fields.some(f=>f.id===saved && f.hidden !== true)) fieldId = saved;
+    else { const vf = t.fields.filter(f=>f.hidden !== true); fieldId = ((vf[0] || t.fields[0] || {}).id) || ''; }
   }
+  try{ if(fieldId) localStorage.setItem('lighter-db-fmt-col:' + tableId, fieldId); }catch(e){}
   // enter batch mode for format selection
   if(!t._batchMode){
     t._batchMode = true;
@@ -6228,12 +6234,12 @@ function openFormatPanel(tableId, rowId, fieldId){
   }
   const panel = document.createElement('div');
   panel.id = 'format-panel';
-  // 「列」下拉：只在"整列 / 当前单元格"时出现（"当前行"跟列无关，显示了反而误导）
-  const colRow = (target==='cell' || target==='col')
-    ? '<div style="grid-column:1/-1"><span class="fm-label">列</span><select class="fm-ctl" style="width:100%" onchange="changeFormatField(\''+tableId+'\',\''+rowId+'\',this.value)">'
-      + t.fields.filter(f=>f.hidden!==true).map(f=>'<option value="'+f.id+'"'+(f.id===fieldId?' selected':'')+'>'+esc(f.name)+'</option>').join('')
-      + '</select></div>'
-    : '';
+  // 「作用列」下拉：**始终显示**。只在整列/当前单元格时才出现的话，用户根本不知道有这个开关
+  //（真机 2026-10-20："只对第一列有效"—— 因为长按在序号列时默认落到第一列，又看不到能换列）
+  const colRow = '<div style="grid-column:1/-1"><span class="fm-label">作用列</span>'
+    + '<select class="fm-ctl" style="width:100%" title="「整列 / 当前单元格」作用在这一列；「当前行」不受它影响" onchange="changeFormatField(\''+tableId+'\',\''+rowId+'\',this.value)">'
+    + t.fields.filter(f=>f.hidden!==true).map(f=>'<option value="'+f.id+'"'+(f.id===fieldId?' selected':'')+'>'+esc(f.name)+'</option>').join('')
+    + '</select></div>';
   panel.innerHTML = `
     <div style="font-weight:600;margin-bottom:8px">格式设置</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
@@ -7920,7 +7926,11 @@ function smartIsReplay(box, minHit){
   if(!tid || _smartHandled.tableId !== tid) return false;
   const frags = _smartHandled.frags;
   if(!frags || !frags.length) return false;
-  const rest0 = normSmartText(box.value || '').replace(/回车|清空/g, '');
+  // ⚠️ 必须用 `smartBoxText`（"真正算数的文字"），不能用 `box.value` ✗ ——
+  //    安卓上清空常退化成"保留隐藏"，整框里还留着前几条的旧文字；
+  //    拿整框判断"是不是重播"会把**正常的新记录**也判成重播 → 弹"刚保存过相同内容"、跳过不存 ✗
+  //    （真机 2026-10-20："输入一次后再输一次，显示刚保存过相同内容"）
+  const rest0 = normSmartText(smartBoxText(box) || '').replace(/回车|清空/g, '');
   if(!rest0) return false;                           // 没实质内容 → 走正常流程（标点尾巴另有处理）
   const r = stripFragsSmart(rest0, frags);
   if(r.rest.length !== 0) return false;              // 还剩下没处理过的内容 → 不是重播
@@ -8840,6 +8850,8 @@ function bindSmartInput(){
       //    单条的完全重播由"隐藏罩"负责（那时 smartBoxText 已经是空、根本不会进到这一步）；
       //    加"相似度"判断会把"张三买书 → 张三买笔"这种正常的连续录入直接杀掉，
       //    表现为「说回车没反应」✗
+      // ⚠️ 安卓上识别框会**累积**（清空常退化成"保留隐藏"），整框天然就含"前几条"的内容。
+      //    所以 smartIsReplay 内部改成看 `smartBoxText`（真正算数的文字），不再看整框 ✓
       if(smartIsReplay(box, 2)){
         vlog('识别框：这批文字是"整段多条重播" → 整批忽略');
         clearTimeout(box._t);
@@ -8913,7 +8925,9 @@ function bindSmartInput(){
       //    短记录（"李四，回车" 只有 2 个有效字）被 leftover 判成"残渣" → 不保存 ✗
       //    真机 2026-10-20：**第一条正常，第二条起全是"没有识别到内容"**，框里内容越堆越多。
       const rawLen = String(smartBoxText(box) || '').replace(/\s/g, '').length;
-      const leftover = meaningful.length < 3 && rawLen > meaningful.length * 4;
+      // ⚠️ 安卓跳过"残渣"判据：识别框会累积，这个长度比较本来就不可靠（真机：短记录被误杀）；
+      //    真残渣（只剩标点）在下面 `filled<=0` 那道闸门会被拦住，不会存出空记录 ✓
+      const leftover = !window.__isAndroid && meaningful.length < 3 && rawLen > meaningful.length * 4;
       // ⭐ 识别器会把**本会话里较早的某一条**原样重新提交（真机：第 1 条 `彭年春…` 被当成
       //    一整块 12 字插回来）→ 它和"本会话已保存过的某一条"**完全相同** → 判定重播、跳过 ✗
       //    只对"整块插入"生效（`chunkIns`）：用户逐字说的（1~3 字）完全不受影响 ✓
