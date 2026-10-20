@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-21.2</title>
+<title>轻量数据库 · v2026-10-21.3</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -975,7 +975,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-21.2">v2026-10-21.2</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-21.3">v2026-10-21.3</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -5413,14 +5413,15 @@ function openHelp(){
     '<h3 style="margin:16px 0 8px">数据安全</h3>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数据存在哪</b>：数据只保存在<b>当前这台设备的浏览器</b>里，不上传任何服务器。换设备、换浏览器、清理缓存都会丢失，请定期用「导出备份」保存 JSON</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>回收站</b>：左侧栏「回收站」，删除的记录先放到这里，可单条还原或彻底清除</p>'+
-    '<p style="margin:4px 0;font-size:13px">• <b>容量预警</b>：侧边栏底部显示占用；接近上限时进度条变红并提示导出备份。写满时<b>保存会失败并弹窗提醒</b>，此时应先导出备份，再删掉一些图片或旧记录释放空间</p>'+
+    '<p style="margin:4px 0;font-size:13px">• <b>容量预警</b>：侧边栏底部显示「合计 / 上限」。浏览器给每个网址的存储上限是 <b>约 524 万个字符</b>（中文一个字算 1 个），应用按「字符 × 2」折算成 <b>10 MB</b> 显示，所以「上限 10 MB」其实就是「524 万字」</p>'+
+    '<p style="margin:4px 0;font-size:13px">• <b>占用变高怎么办</b>：点侧边栏底部的<b>「立即清理」</b>（或红灯提示条里的「清理缓存」），会清掉撤销记录和缓存，<b>数据不受影响</b>。写满时保存会失败并弹窗提醒，此时应先「导出备份」，再删掉一些旧记录释放空间</p>'+
     '<h3 style="margin:16px 0 8px">智能识别规则</h3>'+
     '<p style="margin:4px 0;font-size:13px">• <b>姓名</b>：自动识别中文姓名（2-4字，含复姓）。多个姓名用「和/与/跟/、」连接时（如"张三和李四"）会一并填入，以「、」分隔；单个姓名优先取紧挨电话号的那个，其次取最靠前的。<b>姓名后面紧跟着其他文字时</b>（如"张三丰说今天广州"，中间没有空格），按「姓氏 + 后面两个字」切：单姓共 3 字、复姓共 4 字</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>电话</b>：自动识别11位手机号</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-21.2</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-21.3</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
