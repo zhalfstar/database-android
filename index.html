@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-19.1</title>
+<title>轻量数据库 · v2026-10-20.1</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -923,7 +923,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-19.1">v2026-10-19.1</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-20.1">v2026-10-20.1</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -971,6 +971,10 @@ document.addEventListener('contextmenu', function(e){ e.preventDefault(); }, fal
 /* ===== 基础工具 ===== */
 const LS_KEY = 'lighter-db-v1';
 window.__isMobile = /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent);
+/* 安卓单独标一位：安卓输入法（讯飞/搜狗）提交语音的方式和 iPhone 听写**不一样** ——
+   它常常把一整句**一次性**插进来（beforeinput 的 data 就有 20~40 字），
+   而 iPhone 听写是逐字插入（1~3 字/次）。"回车"怎么切段要靠这个区分（见 smart 回车分支）。 */
+window.__isAndroid = /Android/i.test(navigator.userAgent);
 const TYPE_META = {
   text:{label:'文本', icon:'i-t-text'},
   textarea:{label:'文本(多行)', icon:'i-t-area'},
@@ -5159,7 +5163,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-19.1</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-20.1</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -8853,7 +8857,13 @@ function bindSmartInput(){
       //    ⚠️ 5 而不是 8 ✗ —— 真机实证（23:47.180）：识别器只重播**尾巴**时可能只有 **7 字**
       //    （`陈家炳，回车。`），阈值 8 会漏掉它 → 存出一条**又残缺又重复**的记录 ✗
       //    用户逐字说话是 1~3 字/次，5 足够安全 ✓
-      const takeBefore = endsWithEnter && !bulkInsert;      // 只有"用户逐字说的"才取回车**前**那段
+      // ⭐ 安卓：输入法把**整句一次性提交**（"张三 138… 回车"一次就进来 20~40 字）→ 会被当成
+      //    iOS 那种"整段重写" → 切到"回车**之后**"（空的）→ 说回车没反应、还弹
+      //    "没有识别到内容"、框也被清掉 ✗（真机 2026-10-20 小米反馈）。
+      //    所以安卓上"整块插入 + 以回车结尾"同样取**回车之前**那段；
+      //    重复风险交给下面 resend / resend2 / resend3 / leftover 四道校验兜底 ✓
+      const androidBulk = !!window.__isAndroid && bulkInsert && endsWithEnter;
+      const takeBefore = endsWithEnter && (!bulkInsert || androidBulk);
       let segNow = takeBefore ? enterParts[enterParts.length - 2] : enterParts[enterParts.length - 1];
       if(segNow == null) segNow = '';
       const keep0 = smartStripHandled(segNow).replace(/回车/g, '').trim();
@@ -9009,7 +9019,6 @@ function bindSmartInput(){
     if(e.key==='Enter' && !e.shiftKey){
       e.preventDefault();
       clearTimeout(box._t);
-      box.value = '';
       const form = box.closest('.rec-modal');
       if(!form || !form.dataset.table) return;
       const tid = form.dataset.table;
@@ -9018,6 +9027,17 @@ function bindSmartInput(){
       // 短时间内的第二次直接丢弃，避免存出两条记录 ✗
       const uid = box._uid || (box._uid = 'sb' + Math.random().toString(36).slice(2));
       if(!enterGate(tid, uid)) return;
+      // ⭐ 必须**先把框里的文字识别进表单，再清空** ✗（原来是先无条件 `box.value=''` 再 saveRecord）
+      //    老逻辑靠的是"750ms 防抖已经把表单填好了"，可上面那句 `clearTimeout(box._t)`
+      //    正好把还没跑完的防抖**取消**掉 —— 于是"说完马上按回车"时：文字被清空、表单还是空的
+      //    → 什么都没存、框也空了（安卓输入法整句提交时最容易踩；真机 2026-10-20 反馈）✗
+      //    「回车」两个字是指令不是数据，识别前先去掉；已保存内容的重播不要往里填（防重复）。
+      const _rawTxt = smartBoxText(box);
+      const _txt = String(_rawTxt || '').replace(/回车/g, ' ').trim();
+      if(_txt && !smartIsReplay(box, 2) && !smartIsSavedEcho(normSmartText(_rawTxt))){
+        runSmartFill(tid, _txt);
+      }
+      box.value = '';
       const saved = saveRecord(tid, rid);
       if(saved === true) enterGateDone(tid, uid); else enterGateClear();
     }
