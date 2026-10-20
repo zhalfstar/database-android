@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-20.13</title>
+<title>轻量数据库 · v2026-10-21.1</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -975,7 +975,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-20.13">v2026-10-20.13</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-21.1">v2026-10-21.1</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -1265,6 +1265,13 @@ function onSaveFailed(){
     document.body.appendChild(ov);
   }catch(err){}
 }
+/* localStorage 的真实上限：**按字符数（UTF-16 单元）算**，实测（Chromium 2026-10-21）
+   中文和英文都是写满 5,242,880 个字符就抛 QuotaExceededError，跟 UTF-8 字节数无关。
+   ⚠️ 以前用 `new Blob([v]).size`（UTF-8 字节）除以 5e6 —— 中文内容会被放大 2~3 倍，
+   于是"只用了三分之一"却显示「已用 96%，接近上限」并亮红灯（真机 2026-10-21）✗
+   现在统一按 UTF-16 字节（字符数 × 2）计量，上限 10 MB，跟浏览器的算法一致 ✓ */
+const LS_QUOTA_CHARS = 5242880;
+function lsSizeOf(v){ return String(v == null ? '' : v).length * 2; }
 function storageBreakdown(){
   // 把占用拆成三块：主数据 / 撤销记录 / 其它偏好键。
   // 以前只报一个总数，用户看到「数据才几百 K，却显示 2.32M」会以为数据出问题；
@@ -1276,7 +1283,7 @@ function storageBreakdown(){
       if(!k || k.indexOf('lighter-db-') !== 0) continue;
       const v = localStorage.getItem(k);
       if(!v) continue;
-      const n = new Blob([v]).size;
+      const n = lsSizeOf(v);
       if(k === LS_KEY) data += n;
       else if(k === LS_KEY+'-history') hist += n;
       else other += n;
@@ -1307,15 +1314,21 @@ function refreshStorageUI(){
     }
   }
   // 进度条按**总占用**算（含撤销记录），那才是真正会撞配额的部分
-  const ratio = b.total / 5e6;
+  const quota = LS_QUOTA_CHARS * 2;
+  const ratio = b.total / quota;
   bar.style.width = Math.min(100, ratio * 100).toFixed(2) + '%';
+  // 平时也把「合计 / 上限」写出来，免得只看到一个 2.3M 不知道离满还有多远
+  if(hint && b.hist < 32*1024){
+    hint.textContent = '合计 ' + fmtBytes(b.total) + ' / 上限 ' + fmtBytes(quota);
+    hint.style.display = '';
+  }
   const warn = document.getElementById('storage-warn');
   if(warn){
     const hot = ratio >= 0.8;
     bar.classList.toggle('hot', hot);
     warn.style.display = hot ? 'flex' : 'none';
     if(hot){
-      warn.innerHTML = '<span>已用 ' + Math.round(ratio * 100) + '%，接近上限</span>'+
+      warn.innerHTML = '<span>已用 ' + Math.round(ratio * 100) + '%（' + fmtBytes(b.total) + ' / ' + fmtBytes(quota) + '）</span>'+
         '<button type="button" class="btn sm danger" onclick="exportJSON()">导出备份</button>';
       if(!window._quotaWarned){
         window._quotaWarned = true;
@@ -1327,7 +1340,7 @@ function refreshStorageUI(){
 // 清掉可再生的缓存（撤销记录、UI 偏好），用来在写满时腾地方。数据本身绝不动。
 function evictRegenerableStorage(){
   let freed = 0;
-  const tryDrop = k => { try{ const v = localStorage.getItem(k); if(v){ freed += new Blob([v]).size; localStorage.removeItem(k); } }catch(e){} };
+  const tryDrop = k => { try{ const v = localStorage.getItem(k); if(v){ freed += lsSizeOf(v); localStorage.removeItem(k); } }catch(e){} };
   tryDrop(LS_KEY+'-history');                                  // 撤销记录：最先丢
   ['-table-query','-ov-prefs','-collapsed-folders','-menu-order','-lp-order','-lastrec-size'].forEach(s=>tryDrop(LS_KEY+s));
   return freed;
@@ -2352,7 +2365,10 @@ function bindFolderCardLongPress(){
     card.addEventListener('pointerdown', e=>{
       if(e.pointerType==='mouse' && e.button!==0) return;
       sx=e.clientX; sy=e.clientY;
-      t=setTimeout(()=>{ showTableCardMenu(card, e); }, 600);
+      t=setTimeout(()=>{
+        lpFired = true;                      // 让"松手那一下"的合成 click 被吞掉，避免直接跳进数据表
+        showTableCardMenu(card, e);
+      }, 600);
     });
     const cancel=()=>{ clearTimeout(t); t=null; };
     card.addEventListener('pointermove', e=>{ if(Math.abs(e.clientX-sx)>10||Math.abs(e.clientY-sy)>10) cancel(); });
@@ -2643,6 +2659,7 @@ function lpDown(e){
 function closeOvMenu(){
   const m = document.getElementById('ov-menu');
   if(m) m.remove();
+  lpFired = false;      // 同上：菜单关了就不该再吞下一次点击
 }
 function showOverviewMenu(x, y, scope){
   closeFieldMenu(); closeOvMenu();
@@ -2712,7 +2729,16 @@ document.addEventListener('touchstart', lpDown, {passive:true});
 document.addEventListener('touchend', lpCancel, true);
 document.addEventListener('touchmove', lpMove, {passive:true});
 document.addEventListener('click', e=>{
-  if(lpFired){ lpFired = false; e.preventDefault(); e.stopPropagation(); }
+  if(!lpFired) return;
+  // ⚠️ 菜单/弹窗里的点击**一律放行** ✗ —— 长按松手时安卓**不一定**补发那一下合成 click，
+  //    `lpFired` 就会一直挂着，把菜单里点的第一下吞掉 → 「删除/重命名/分享」必须点两次才生效
+  //    （真机 2026-10-21 安卓：概览长按卡片，三个菜单项都要按两次）
+  if(e.target.closest('#field-menu, #ov-menu, #modal-root, .modal')){
+    lpFired = false;
+    return;
+  }
+  lpFired = false;
+  e.preventDefault(); e.stopPropagation();
 }, true);
 document.addEventListener('click', e=>{
   const _om = document.getElementById('ov-menu');
@@ -2754,7 +2780,9 @@ function createFolder(){
 function showTableCardMenu(cardEl, ev){
   const tableId = cardEl.dataset.id;
   const t = db.tables.find(x=>x.id===tableId); if(!t) return;
+  const _keepFired = lpFired;      // closeFieldMenu() 会清掉这个标记，但"松手那一下"还得继续吞掉
   closeFieldMenu();
+  lpFired = _keepFired;
   const menu = document.createElement('div');
   menu.id = 'field-menu';
   menu.style.minWidth = '160px';
@@ -5364,7 +5392,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-20.13</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-21.1</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -7223,6 +7251,9 @@ function makeFieldMenuDraggable(menu){
 function closeFieldMenu(){
   const m = document.getElementById('field-menu');
   if(m) m.remove();
+  // 菜单关掉之后，就没什么需要"吞掉长按松手那一下"了 —— 顺手清标记，
+  // 免得残留标记把**下一次正常点击**吃掉（真机 2026-10-21：菜单项要点两次才生效）
+  lpFired = false;
 }
 function clearColFilter(tableId, fieldId){ const u = uiFor(tableId); u.col[fieldId]=''; renderGrid(tableId); }
 function clearFilters(tableId){ const u = uiFor(tableId); u.q=''; u.col={}; renderTable(db.tables.find(x=>x.id===tableId)); }
