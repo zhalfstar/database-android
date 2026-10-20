@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-20.7</title>
+<title>轻量数据库 · v2026-10-20.8</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -949,7 +949,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-20.7">v2026-10-20.7</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-20.8">v2026-10-20.8</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -5312,7 +5312,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-20.7</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-20.8</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -8971,7 +8971,11 @@ function bindSmartInput(){
     // 智能识别：出现"清空"二字 → 清空识别框（不再解析）
     // ⚠️ 重播守卫**不**拦这一步：清空是幂等的、重放一次没有副作用（不会多存记录），
     //    而拦它反而会误伤 —— 用户刚说过内容、紧接着说"清空"时会被整批丢掉 ✗
-    if(smartHasClearCmd(box.value)){
+    // ⚠️ 必须看"真正算数的文字"（smartBoxText），**不能看 box.value** ✗ ——
+    //    「保留隐藏」清空方式下旧文字一个都没删，框里会**永远留着"清空"两个字**；
+    //    拿 box.value 判 → 之后**每一次输入**都被当成又说了"清空" → 一直弹「已清空」、
+    //    永远识别不到内容，等于把输入彻底卡死 ✗（真机 2026-10-20："说完清空之后，再也不能输入，一直说已清空"）
+    if(smartHasClearCmd(smartBoxText(box))){
       clearTimeout(box._t);
       smartNoteHandled(box, smartBoxText(box));     // 记下"这批已处理"（要在清空之前取）
       box._clearAt = Date.now();
@@ -9070,7 +9074,9 @@ function bindSmartInput(){
       const takeBefore = endsWithEnter && (!bulkInsert || androidBulk);
       let segNow = takeBefore ? enterParts[enterParts.length - 2] : enterParts[enterParts.length - 1];
       if(segNow == null) segNow = '';
-      const keep0 = smartStripHandled(segNow).replace(/回车/g, '').trim();
+      // ⚠️ 「清空」也要剔掉：隐藏模式下旧文字一个都没删，框里可能永远留着"清空"两个字，
+      //    不剔的话它会混进待识别内容 → runSmartFill 又把它当成"清空指令"、把表单清掉 ✗
+      const keep0 = smartStripHandled(segNow).replace(/回车|清空/g, ' ').trim();
       // ⭐ 剔除后若只剩"残渣"（几乎全是标点）→ 当成没有内容。
       //    真机日志实证：识别器"整段改写"时会把旧记录的文字改掉，对不上就留下残渣
       //    （`待识别=len=11 "，。叶美 ，。 ，。。"`），残渣被解析出来就是一条错记录 ✗
