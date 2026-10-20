@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-20.1</title>
+<title>轻量数据库 · v2026-10-20.2</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -505,6 +505,15 @@ th.sorted{color:var(--accent-hi)}
 .fm-ctl{flex:1;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12.5px;outline:none;font-family:inherit;min-width:0}
 .fm-ctl:focus{border-color:var(--accent)}
 .fm-clear{margin-left:auto;color:var(--accent-hi);text-decoration:underline;background:none;border:none;cursor:pointer;font-size:12px;font-family:inherit;padding:0}
+/* 手机上把格式面板的控件放大 —— 原来「左/中/右」只有 32×26（安卓建议触摸目标 ≥44），
+   手指稍一偏就落进按钮之间的空隙，什么都不会发生，用户感知就是"点了没反应" ✗ */
+@media (max-width:768px){
+  #format-panel{padding:14px}
+  .fm-ctl{min-height:38px;font-size:14px}
+  .fm-btn{flex:1;min-height:42px;padding:0;font-size:14px;border-radius:8px}
+  .fm-clear{min-height:34px;padding:0 8px;font-size:12.5px;align-self:center}
+  .fm-align-row{display:flex;gap:6px;grid-column:1/-1}
+}
 td.num,th.num{text-align:right}
 .cell-empty{color:#c3c9d2}
 .cell-img{max-width:100%;max-height:48px;border-radius:6px;display:block;object-fit:cover}.cell-sig{height:22px;max-height:22px;width:auto;max-width:120px;object-fit:contain;border-radius:3px;display:inline-block;vertical-align:middle}
@@ -923,7 +932,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-20.1">v2026-10-20.1</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-20.2">v2026-10-20.2</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -5163,7 +5172,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-20.1</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-20.2</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -6248,11 +6257,12 @@ function openFormatPanel(tableId, rowId, fieldId){
           <input type="color" class="fm-ctl" style="flex:1" value="${st.bgColor||'#ffffff'}" oninput="applyStyleNoRefresh('${tableId}','${rowId}','${fieldId}','bgColor',this.value)" onchange="applyStyle('${tableId}','${rowId}','${fieldId}','bgColor',this.value)">
           <button type="button" class="fm-clear" onclick="applyStyle('${tableId}','${rowId}','${fieldId}','bgColor','')">清除</button>
         </div></div>
-      <div><span class="fm-label">对齐</span>
-        <div style="display:flex;gap:4px">
+      <div style="grid-column:1/-1"><span class="fm-label">对齐</span>
+        <div class="fm-align-row" style="display:flex;gap:4px">
           <button type="button" class="fm-btn${st.textAlign==='left'?' on':''}" onclick="applyStyle('${tableId}','${rowId}','${fieldId}','textAlign','left')">左</button>
           <button type="button" class="fm-btn${st.textAlign==='center'?' on':''}" onclick="applyStyle('${tableId}','${rowId}','${fieldId}','textAlign','center')">中</button>
           <button type="button" class="fm-btn${st.textAlign==='right'?' on':''}" onclick="applyStyle('${tableId}','${rowId}','${fieldId}','textAlign','right')">右</button>
+          <button type="button" class="fm-btn${!st.textAlign?' on':''}" onclick="applyStyle('${tableId}','${rowId}','${fieldId}','textAlign','')" title="恢复默认对齐">默认</button>
         </div></div>
     </div>
     <button type="button" class="btn primary" style="width:100%;margin-top:8px" onclick="closeFormatPanel()">关闭</button>`;
@@ -6334,6 +6344,12 @@ function applyStyle(tableId, rowId, fieldId, key, value){
     else fmtLabel = '格式设置：行「'+(rn||'')+'」';
   }catch(e){}
   save(fmtLabel); render();
+  // ⭐ 点了要有明确反馈：手机上"对齐"经常看不出变化（本来就是左对齐），
+  //    不提示的话用户会以为"点了没反应" ✗
+  if(key === 'textAlign'){
+    toast(value === 'center' ? '已设为居中' : value === 'right' ? '已设为右对齐'
+        : value === 'left' ? '已设为左对齐' : '已恢复默认对齐');
+  }
   if(t._batchMode) exitBatchMode(tableId);
   openFormatPanel(tableId, rowId, fieldId);
 }
