@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-21.1</title>
+<title>轻量数据库 · v2026-10-21.2</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -161,8 +161,8 @@ nav{padding:4px 10px}
 .search-box input:focus{border-color:var(--accent)}
 /* 概览页：全局搜索从顶栏挪到内容区（h1「概览」右边），顶栏那个隐藏 */
 /* ===== 存储容量预警 ===== */
-.storage-warn{margin-top:7px;font-size:11px;color:var(--danger-hi);display:flex;align-items:center;justify-content:space-between;gap:6px}
-.storage-warn .btn{padding:3px 8px;font-size:11px}
+.storage-warn{margin-top:7px;font-size:11px;color:var(--danger-hi);display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}
+.storage-warn .btn{padding:3px 8px;font-size:11px;flex:none;white-space:nowrap}
 #storage-bar.hot{background:var(--danger)}
 /* ===== 全局搜索 ===== */
 .top-searches{margin-left:auto;display:flex;align-items:center;gap:8px;flex:none}
@@ -975,7 +975,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-21.1">v2026-10-21.1</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-21.2">v2026-10-21.2</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -1303,23 +1303,28 @@ function refreshStorageUI(){
   // 于是"清空/导入后数字一直不变"（撤销快照把差额顶住了）✗ —— 用户会以为数据没生效。
   num.textContent = fmtBytes(b.data);
   num.title = '数据 ' + fmtBytes(b.data) + ' · 撤销记录 ' + fmtBytes(b.hist) + ' · 其它 ' + fmtBytes(b.other) + ' · 合计 ' + fmtBytes(b.total);
-  const hint = document.getElementById('storage-hint');
-  if(hint){
-    if(b.hist >= 32*1024){
-      hint.innerHTML = '撤销记录 ' + fmtBytes(b.hist) + '（合计 ' + fmtBytes(b.total) + '）· <a onclick="clearUndoHistory()" style="color:var(--accent-hi);cursor:pointer">清理</a>';
-      hint.style.display = '';
-    }else{
-      hint.textContent = '';
-      hint.style.display = 'none';
-    }
-  }
-  // 进度条按**总占用**算（含撤销记录），那才是真正会撞配额的部分
+  // 进度条按**总占用**算（含撤销记录/缓存），那才是真正会撞配额的部分
   const quota = LS_QUOTA_CHARS * 2;
   const ratio = b.total / quota;
   bar.style.width = Math.min(100, ratio * 100).toFixed(2) + '%';
-  // 平时也把「合计 / 上限」写出来，免得只看到一个 2.3M 不知道离满还有多远
-  if(hint && b.hist < 32*1024){
-    hint.textContent = '合计 ' + fmtBytes(b.total) + ' / 上限 ' + fmtBytes(quota);
+  // 副标题：永远写「合计 / 上限」，**可清理的部分一律带「清理」入口** ✗
+  // 以前只有 `hist>=32KB` 才出「清理」链接 —— 而占空间最大的其实常常是
+  // `lighter-db-v1-backup`（整库快照，落在 other 桶里），于是「占了 4 个多 M 却没有清理按钮」
+  // （真机 2026-10-21：合计 8.42 MB / 上限 10 MB，找不到清理入口）✗
+  const cacheable = b.hist + b.other;
+  const hint = document.getElementById('storage-hint');
+  if(hint){
+    let txt = '合计 ' + fmtBytes(b.total) + ' / 上限 ' + fmtBytes(quota);
+    if(cacheable >= 32*1024){
+      // 分两行写：第一行「合计/上限」，第二行「可清理 X · 立即清理」
+      // （挤在一行时手机侧边栏只有 ~240px，会把「清理」两个字折成两行 ✗）
+      hint.innerHTML = '合计 ' + fmtBytes(b.total) + ' / 上限 ' + fmtBytes(quota) +
+        '<br><span style="white-space:nowrap">可清理 ' + fmtBytes(cacheable) +
+        ' · <a onclick="clearCaches()" style="color:var(--accent-hi);cursor:pointer;font-weight:600">立即清理</a></span>';
+      hint.title = '撤销记录 ' + fmtBytes(b.hist) + ' · 其它缓存 ' + fmtBytes(b.other) + '（数据不受影响）';
+    }else{
+      hint.textContent = txt;
+    }
     hint.style.display = '';
   }
   const warn = document.getElementById('storage-warn');
@@ -1329,7 +1334,9 @@ function refreshStorageUI(){
     warn.style.display = hot ? 'flex' : 'none';
     if(hot){
       warn.innerHTML = '<span>已用 ' + Math.round(ratio * 100) + '%（' + fmtBytes(b.total) + ' / ' + fmtBytes(quota) + '）</span>'+
-        '<button type="button" class="btn sm danger" onclick="exportJSON()">导出备份</button>';
+        '<span style="display:flex;gap:6px">'+
+        (cacheable >= 32*1024 ? '<button type="button" class="btn sm" onclick="clearCaches()">清理缓存</button>' : '')+
+        '<button type="button" class="btn sm danger" onclick="exportJSON()">导出备份</button></span>';
       if(!window._quotaWarned){
         window._quotaWarned = true;
         toast('存储空间已用 ' + Math.round(ratio * 100) + '%，建议导出备份');
@@ -1341,17 +1348,38 @@ function refreshStorageUI(){
 function evictRegenerableStorage(){
   let freed = 0;
   const tryDrop = k => { try{ const v = localStorage.getItem(k); if(v){ freed += lsSizeOf(v); localStorage.removeItem(k); } }catch(e){} };
-  tryDrop(LS_KEY+'-history');                                  // 撤销记录：最先丢
+  tryDrop(LS_KEY+'-backup');                                   // 旧的整库快照：最大的一块，且没有代码读它
+  tryDrop(LS_KEY+'-history');                                  // 撤销记录
   ['-table-query','-ov-prefs','-collapsed-folders','-menu-order','-lp-order','-lastrec-size'].forEach(s=>tryDrop(LS_KEY+s));
   return freed;
 }
-// 侧边栏「存储占用」里的「清理」：手动丢掉撤销记录换空间（数据不受影响）
-function clearUndoHistory(){
-  const b = storageBreakdown();
+/* 侧边栏「存储占用」里的「清理」：丢掉**可再生的缓存**，数据本身绝不动。
+   清的是：撤销记录（-history）+ 旧整库快照（-backup）+ 查询/浮层位置之类的偏好。
+   ⚠️ `-backup` 是以前"彻底删除/清空回收站前"写的整库快照，**从来没有任何代码读它**，
+   等于白占一整份数据的空间（真机 2026-10-21：数据 4.24 MB，它 4.18 MB，合计直接到 84%）✗
+   现在不再写它了，存量也在这里清掉 ✓ */
+function clearCaches(){
+  const before = storageBreakdown();
+  const beforeCache = before.hist + before.other;
   try{ localStorage.removeItem(LS_KEY+'-history'); }catch(e){}
+  try{ localStorage.removeItem(LS_KEY+'-backup'); }catch(e){}
+  ['-table-query','-lp-order','-lastrec-size'].forEach(s=>{ try{ localStorage.removeItem(LS_KEY+s); }catch(e){} });
+  // 浮层位置（lighter-db-float-*）也是可再生缓存
+  try{
+    const drop = [];
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(k && k.indexOf('lighter-db-float-') === 0) drop.push(k);
+    }
+    drop.forEach(k=>localStorage.removeItem(k));
+  }catch(e){}
   refreshStorageUI();
-  toast('已清理撤销记录，释放 ' + fmtBytes(b.hist));
+  const after = storageBreakdown();
+  const freed = Math.max(0, beforeCache - (after.hist + after.other));
+  toast(freed > 0 ? ('已清理缓存，释放 ' + fmtBytes(freed) + '（数据未动）') : '没有可清理的缓存');
 }
+// 兼容旧调用点（测试里也用到这个名字）
+function clearUndoHistory(){ clearCaches(); }
 function seed(){
   const mk = (name,type)=>({ id:uid(), name, type });
   const now = Date.now();
@@ -5392,7 +5420,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-21.1</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-21.2</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -7361,16 +7389,18 @@ function restoreTrashItem(trashId){
 }
 function purgeTrashItem(trashId){
   confirmDialog('彻底删除该次删除的全部记录？删除后无法找回。', ()=>{
-    // 不可逆操作：留一份整库快照兜底（会被下次覆盖，不会无限增长）
-    try{ localStorage.setItem(LS_KEY+'-backup', JSON.stringify(db)); }catch(e){}
+    // ⚠️ 这里原来会写一份**整库快照**到 `-backup` 当"兜底"，但**没有任何代码读它** ——
+    //    等于白占一整份数据的空间（真机 2026-10-21：数据 4.24 MB + 快照 4.18 MB = 84%）。
+    //    已删掉；真要兜底请用「导出备份」。存量在「存储占用 → 清理」里清。
     db.trash = db.trash.filter(x=>x.id!==trashId);
     save(); render(); toast('已彻底删除');
   });
 }
 function clearTrash(){
   confirmDialog('清空回收站？删除后无法找回。', ()=>{
-    // 不可逆操作：留一份整库快照兜底
-    try{ localStorage.setItem(LS_KEY+'-backup', JSON.stringify(db)); }catch(e){}
+    // ⚠️ 这里原来会写一份**整库快照**到 `-backup` 当"兜底"，但**没有任何代码读它** ——
+    //    等于白占一整份数据的空间（真机 2026-10-21：数据 4.24 MB + 快照 4.18 MB = 84%）。
+    //    已删掉；真要兜底请用「导出备份」。存量在「存储占用 → 清理」里清。
     db.trash = [];
     save(); render(); toast('回收站已清空');
   });
