@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-20.10</title>
+<title>轻量数据库 · v2026-10-20.11</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -975,7 +975,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-20.10">v2026-10-20.10</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-20.11">v2026-10-20.11</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -5364,7 +5364,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-20.10</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-20.11</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -8323,8 +8323,99 @@ function smartSameAsLastSaved(tid, sig){
   return arr.some(e=>e.sig === sig && (now - e.at) <= REPLAY_WINDOW_MS);
 }
 /* 识别框里"真正算数"的文字（见上面 ① 的说明） */
+/* ===== 安卓专用语音录入（与 iPhone **完全分开**的一套逻辑）=====
+   为什么必须分开：安卓输入法（豆包/讯飞）的提交方式和 iPhone 听写根本不同 ——
+   每次 `beforeinput(insertCompositionText)` 的 `data` 是**整个框**，保存后还会把旧文字
+   重新提交一遍。所以"框"天然就是整个会话的累积文本，iPhone 那套判据在安卓上全是误报来源：
+     · `smartIsReplay`（整框是不是重播）→ 必然误判
+     · `smartIsSavedText`（编辑距离 ≤1/3）→ 同名不同数字就被当重复
+     · `_pendingClear` + 快照匹配 → 输入法一改写就"旧文字全显形、从第一条开始认"
+     · `leftover`（残渣判据）→ 长度比较不可靠
+   安卓改用**只依赖「回车」个数**的模型（回车是稳定的：说了几条就有几个回车）：
+     · 框里第 i 个「回车」之前那段 = 第 i 条记录
+     · `_andConsumed` = 已经处理到第几个回车
+     · 正在说的那条 = 最后一个「回车」之后那段（也就是"真正算数的文字"）
+   ⚠️ 这套只在 `window.__isAndroid` 下被调用，iPhone 一行都不走 ✓ */
+let _andConsumed = 0, _andTid = '', _andUid = '', _andBoxEl = null;
+let _andSaved = new Set();          // 本会话已经存过的段（归一化）—— 重播/重复直接跳过
+
+function andReset(box, tid){
+  const uid = box._uid || (box._uid = 'sb' + Math.random().toString(36).slice(2));
+  if(_andTid !== tid){                       // 换表 → 全部归零
+    _andTid = tid; _andUid = uid; _andBoxEl = box;
+    _andConsumed = 0; _andSaved = new Set();
+    return;
+  }
+  if(_andUid !== uid || _andBoxEl !== box){
+    // 弹窗被重建（保存后"连续语音输入"会原地重置、甚至换掉输入框）→ 只归零"回车计数"，
+    // ⚠️ `_andSaved` 必须**跨弹窗保留** ✗ —— 安卓输入法会把旧文字整段重新提交，
+    //    没有这份记录就会把上一条又存一遍（实测重复率 100%）
+    _andUid = uid; _andBoxEl = box; _andConsumed = 0;
+  }
+}
+/* 当前正在说的那条 = 最后一个「回车」之后那段 */
+function andCurrentText(box){
+  const parts = String((box && box.value) || '').split(/回车/);
+  return parts[parts.length - 1] || '';
+}
+function andVoiceInput(box){
+  const form = box.closest('.rec-modal');
+  const tid = form && form.dataset.table;
+  if(!tid) return false;
+  andReset(box, tid);
+  const raw = box.value || '';
+  if(!raw.trim()){ _andConsumed = 0; syncSmartMirror(); return true; }
+  const parts = raw.split(/回车/);
+  const K = parts.length - 1;            // 框里现在有几个「回车」
+  const cur = parts[K] || '';            // 正在说的这条
+
+  // ① 「清空」指令：安卓上可以**真清空**（不写 value 只是为了不打断 iOS 听写）
+  if(smartHasClearCmd(cur)){
+    try{ hardClearInput(box); }catch(e){}
+    _andConsumed = 0; _andSaved = new Set();
+    clearSmartForm(tid);
+    syncSmartMirror();
+    toast('已清空，继续说');
+    return true;
+  }
+
+  // ② 出现新的「回车」→ 把已说完的那段存掉（通常只有一段）
+  if(K > _andConsumed){
+    let seg = '';
+    for(let i = _andConsumed; i < K; i++) seg = String(parts[i] || seg);
+    seg = seg.replace(/回车|清空/g, ' ').trim();
+    const n = normSmartText(seg);
+    _andConsumed = K;
+    if(!n){ if(seg) toast('没有识别到内容，已跳过'); syncSmartMirror(); return true; }   // 只剩标点
+    if(_andSaved.has(n)){ vlog('安卓：这条本会话已经存过 → 跳过'); syncSmartMirror(); return true; }
+    _andSaved.add(n);
+    const filled = runSmartFill(tid, seg);
+    if(filled <= 0){ toast('没有识别到内容，已跳过'); syncSmartMirror(); return true; }
+    setTimeout(()=>{ saveRecord(tid, form.dataset.rowid || ''); }, 0);
+    // 录满 N 条真清空一次，避免框无限增长（可在「更多 → 自动清空」改/关）
+    const every = autoClearEvery();
+    if(every > 0 && _andConsumed >= every){
+      try{ hardClearInput(box); }catch(e){}
+      _andConsumed = 0;
+      vlog('安卓：已录满 ' + every + ' 条 → 真清空识别框');
+    }
+    syncSmartMirror();
+    return true;
+  }
+
+  // ③ 普通输入：延迟自动填表（喂"当前这条"，不喂整框）
+  if(cur.trim()){
+    box._t = setTimeout(()=>{ try{ if(cur.trim()) runSmartFill(tid, cur); }catch(e){} }, 750);
+  }
+  syncSmartMirror();
+  return true;
+}
 function smartBoxText(box){
   if(!box) return '';
+  // ⭐ 安卓走**独立模型**：真正算数的文字 = 最后一个「回车」之后那段（= 正在说的这条）。
+  //    完全不碰下面这套"快照/隐藏罩"逻辑 —— 那套依赖"旧文字原样还在框里"，
+  //    而安卓输入法会整段改写，一改就快照对不上 → 旧文字全部显形、识别从第一条开始 ✗
+  if(window.__isAndroid) return andCurrentText(box);
   const raw = box.value || '';
   const snap = box._clearedSnapshot;
   if(!box._pendingClear || !snap || !snap.length) return raw;
@@ -9025,6 +9116,8 @@ function bindSmartInput(){
   box.addEventListener('input', ()=>{
     clearTimeout(box._t);
     vlog('input ' + vlogText(box.value) + (box._pendingClear ? '（待清空，旧文字还在框里）' : ''));
+    // ⭐ 安卓走**独立引擎**（andVoiceInput）：只依赖「回车」个数，完全不进下面 iPhone 那套判据 ✓
+    if(window.__isAndroid && andVoiceInput(box)) return;
     // ⭐ 累积"识别框里出现过的原始文字"（识别器会把它改写，改写前的版本要留一份）✓
     try{
       const _n = normSmartText(box.value || '');
@@ -9345,6 +9438,7 @@ function bindSmartInput(){
         runSmartFill(tid, _txt);
       }
       box.value = '';
+      if(window.__isAndroid){ _andConsumed = 0; }   // 安卓：框被清空，回车计数归零（已存段要保留，防重播）
       const saved = saveRecord(tid, rid);
       if(saved === true) enterGateDone(tid, uid); else enterGateClear();
     }
