@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-20.4</title>
+<title>轻量数据库 · v2026-10-20.5</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -932,7 +932,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-20.4">v2026-10-20.4</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-20.5">v2026-10-20.5</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -5172,7 +5172,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-20.4</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-20.5</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -7880,12 +7880,17 @@ function smartOverlapsHistory(tid, text){
    （`五鬼太岁` → `岁破太岁`），用户看到的就是"最后一条与第一条**不完全一致**"。
    所以先比完全相同，再按**编辑距离**宽松比一次。
    安全前提：只在"整块插入"（chunkIns）时才调用 → 用户**逐字说的**永远不受影响 ✓ */
-function smartIsSavedText(tid, text){
+function smartIsSavedText(tid, text, exactOnly){
   if(!tid || _smartHandled.tableId !== tid) return false;
   const n = normSmartText(String(text || '').replace(/回车|清空/g, ''));
   if(!n) return false;
   const list = _smartHandled.saved || [];
   if(list.indexOf(n) >= 0) return true;                 // 完全相同
+  // ⚠️ 安卓传 exactOnly=true：安卓的"一整块插入"是**常态**（整框提交），
+  //    下面这条"改写过的版本（编辑距离 ≤1/3）"就会把**正常的连续录入**误判成重播 ✗
+  //    —— 真机 2026-10-20：`张正会 200，微信。` 和上一条 `张正浩 100，微信。` 只差 2 个字，
+  //    被判成重播 → 整条丢掉（弹"没有识别到内容"）。安卓只认"一模一样"才算重复 ✓
+  if(exactOnly) return false;
   if(n.length < 6) return false;                        // 太短容易误判（且短内容不会"整块插入"）
   for(const s of list){
     if(!s || Math.abs(s.length - n.length) > 3) continue;
@@ -7926,11 +7931,7 @@ function smartIsReplay(box, minHit){
   if(!tid || _smartHandled.tableId !== tid) return false;
   const frags = _smartHandled.frags;
   if(!frags || !frags.length) return false;
-  // ⚠️ 必须用 `smartBoxText`（"真正算数的文字"），不能用 `box.value` ✗ ——
-  //    安卓上清空常退化成"保留隐藏"，整框里还留着前几条的旧文字；
-  //    拿整框判断"是不是重播"会把**正常的新记录**也判成重播 → 弹"刚保存过相同内容"、跳过不存 ✗
-  //    （真机 2026-10-20："输入一次后再输一次，显示刚保存过相同内容"）
-  const rest0 = normSmartText(smartBoxText(box) || '').replace(/回车|清空/g, '');
+  const rest0 = normSmartText(box.value || '').replace(/回车|清空/g, '');
   if(!rest0) return false;                           // 没实质内容 → 走正常流程（标点尾巴另有处理）
   const r = stripFragsSmart(rest0, frags);
   if(r.rest.length !== 0) return false;              // 还剩下没处理过的内容 → 不是重播
@@ -8850,9 +8851,14 @@ function bindSmartInput(){
       //    单条的完全重播由"隐藏罩"负责（那时 smartBoxText 已经是空、根本不会进到这一步）；
       //    加"相似度"判断会把"张三买书 → 张三买笔"这种正常的连续录入直接杀掉，
       //    表现为「说回车没反应」✗
-      // ⚠️ 安卓上识别框会**累积**（清空常退化成"保留隐藏"），整框天然就含"前几条"的内容。
-      //    所以 smartIsReplay 内部改成看 `smartBoxText`（真正算数的文字），不再看整框 ✓
-      if(smartIsReplay(box, 2)){
+      // ⚠️ 安卓上**不能**做这个"整框重播"判定 ✗ —— 真机日志实证（2026-10-20，用户抓的 150 条）：
+      //    ① 安卓输入法每次提交的 `data` 是**整个框的内容**（insertCompositionText），
+      //       框里天然累积着前几条，保存后 IME 还会把旧文字重新提交一遍；
+      //    ② `stripFragsSmart` 是**模糊匹配**（任意位置、允许差异），新记录只要和前两条
+      //       "长得像"（比如同名不同数字）就会被整段剥光 → 判成"整段重播"→ 整批忽略 ✗
+      //       日志实证：`张正会 200，微信。回车` 就是这样被丢掉的（提示"刚保存过相同内容"）。
+      //    安卓的重复录入由**按段**的三道校验兜底（resend/resend2/resend3）+ enterGate 冷却 ✓
+      if(!window.__isAndroid && smartIsReplay(box, 2)){
         vlog('识别框：这批文字是"整段多条重播" → 整批忽略');
         clearTimeout(box._t);
         // 把这**整批**也记成"已处理"，并把隐藏罩更新到整批 ——
@@ -8931,7 +8937,7 @@ function bindSmartInput(){
       // ⭐ 识别器会把**本会话里较早的某一条**原样重新提交（真机：第 1 条 `彭年春…` 被当成
       //    一整块 12 字插回来）→ 它和"本会话已保存过的某一条"**完全相同** → 判定重播、跳过 ✗
       //    只对"整块插入"生效（`chunkIns`）：用户逐字说的（1~3 字）完全不受影响 ✓
-      const resend = !!(keep0 && chunkIns && smartIsSavedText(tid, keep0));
+      const resend = !!(keep0 && chunkIns && smartIsSavedText(tid, keep0, !!window.__isAndroid));
       // ⭐ 与"已保存过的某条"有长公共子串（≥10 字）→ 也是重播（识别器重播修订前的文字）✗
       const resend2 = !!(keep0 && smartOverlapsSaved(tid, keep0));
       // ⭐ 与"前几条记录当时的原始文字"长重合 → 也是重播（修订前的版本）✗
