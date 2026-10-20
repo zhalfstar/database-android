@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-20.9</title>
+<title>轻量数据库 · v2026-10-20.10</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -613,6 +613,14 @@ input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px;cursor:po
 .overlay:has(.rec-modal){padding:0;background:rgba(0,0,0,0)}
 .modal{background:var(--panel);border:1px solid var(--line2);border-radius:14px;width:100%;max-width:560px;box-shadow:0 24px 60px rgba(15,23,42,.18);animation:pop .2s ease;display:flex;flex-direction:column;position:fixed}
 #format-panel{position:fixed;background:var(--panel);border-radius:12px;box-shadow:0 10px 40px rgba(0,0,0,0.2);z-index:1000;padding:16px;min-width:220px}
+/* ⭐ 面板改成"把手 + 可滚动内容 + 底部按钮"三段式：
+   以前内容没有滚动容器，把面板拖小之后控件会被**裁掉/溢出到面板外面**，
+   拖大又只是背景变大、内容原地不动（真机 2026-10-20："内容不会随页面大小改变，改变的只是背景"）。
+   现在内容区自己滚、列宽跟着面板宽度走，缩放时才有正常反馈 ✓ */
+#format-panel{display:flex;flex-direction:column;overflow:hidden}
+#format-panel .fm-body{flex:1;min-height:0;overflow:auto;display:grid;grid-template-columns:1fr 1fr;
+  gap:8px;align-content:start;-webkit-overflow-scrolling:touch}
+#format-panel .fm-drag,#format-panel .fm-foot{flex:none}
 #format-panel.show{display:block}
 .res-handle{position:absolute;right:0;bottom:0;width:40px;height:40px;cursor:nwse-resize;touch-action:none;z-index:7;background:linear-gradient(135deg,transparent 55%,rgba(66,133,244,.5) 55%,rgba(66,133,244,.5) 65%,transparent 65%),linear-gradient(135deg,transparent 72%,rgba(66,133,244,.35) 72%,rgba(66,133,244,.35) 82%,transparent 82%);border-bottom-right-radius:20px}
 .res-edge-r{position:absolute;top:0;right:0;bottom:16px;width:8px;cursor:ew-resize;touch-action:none;z-index:5}
@@ -967,7 +975,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-20.9">v2026-10-20.9</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-20.10">v2026-10-20.10</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -3711,6 +3719,7 @@ function renderTable(t){
     newSheet: `<button type="button" data-key="newSheet" onclick="closeMenu('bar-menu');openCreateSheet('${t.id}')">${svg('i-plus')} 新建工作表</button>`,
     viewDiag: `<button type="button" data-key="viewDiag" onclick="closeMenu('bar-menu');openViewDiag()">${svg('i-eye')} 视图诊断/复位</button>`,
     clearMode: `<button type="button" data-key="clearMode" onclick="closeMenu('bar-menu');toggleClearMode()">${svg('i-t-area')} 清空方式：${clearModeLabel()}</button>`,
+    autoClear: `<button type="button" data-key="autoClear" onclick="closeMenu('bar-menu');cycleAutoClear()">${svg('i-t-area')} 自动清空：${autoClearLabel()}</button>`,
     condRules: `<button type="button" data-key="condRules" onclick="closeMenu('bar-menu');openCondRules('${t.id}')">${svg('i-format')} 条件格式</button>`,
     groupStats: `<button type="button" data-key="groupStats" onclick="closeMenu('bar-menu');openGroupStats('${t.id}')">${svg('i-db')} 分组统计</button>`,
     preview: `<button type="button" data-key="preview" onclick="openPreview('${t.id}');closeMenu('bar-menu')">${svg('i-eye')} 预览</button>`,
@@ -3723,7 +3732,7 @@ function renderTable(t){
         <button type="button" onclick="exportPDF('${t.id}')">${svg('i-download')} 导出 PDF</button>
       </div></div>`
   };
-  const barHtml = orderKeys('lighter-db-menu-order', ['undo','manage','newSheet','condRules','groupStats','clearMode','viewDiag','preview','ioSub'], barItems);
+  const barHtml = orderKeys('lighter-db-menu-order', ['undo','manage','newSheet','condRules','groupStats','clearMode','autoClear','viewDiag','preview','ioSub'], barItems);
   // iPhone「添加到主屏幕」独立窗口模式：额外给一个跳出到 Safari 的出口（原因见 isStandaloneApp 的注释）。
   // 只在独立模式下出现 —— 以后若改成 Safari 打开，它会自动消失，不留垃圾 ✓
   const safariItem = isStandaloneApp()
@@ -5355,7 +5364,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-20.9</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-20.10</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -6425,7 +6434,7 @@ function openFormatPanel(tableId, rowId, fieldId){
     + '</select></div>';
   panel.innerHTML = `
     <div class="fm-drag">${svg('i-more')}格式设置<span class="fm-drag-hint">按住可拖动</span></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+    <div class="fm-body">
       <div><span class="fm-label">应用</span>
         <select class="fm-ctl" style="width:100%" onchange="changeFormatTarget('${tableId}','${rowId}','${fieldId}',this.value)">
           <option value="row"${target==='row'?' selected':''}>当前行</option>
@@ -6470,7 +6479,7 @@ function openFormatPanel(tableId, rowId, fieldId){
           <button type="button" class="fm-btn${!st.textAlign?' on':''}" onclick="applyStyle('${tableId}','${rowId}','${fieldId}','textAlign','')" title="恢复默认对齐">默认</button>
         </div></div>
     </div>
-    <button type="button" class="btn primary" style="width:100%;margin-top:8px" onclick="closeFormatPanel()">关闭</button>`;
+    <button type="button" class="btn primary fm-foot" style="width:100%;margin-top:8px" onclick="closeFormatPanel()">关闭</button>`;
   document.body.appendChild(panel);
   panel.style.top = '80px';
   panel.style.right = '10px';
@@ -7906,6 +7915,25 @@ function clearMode(){
   }catch(e){ return 'edit'; }
 }
 function clearModeLabel(){ return clearMode() === 'edit' ? '直接抹掉' : '保留隐藏'; }
+/* 「每录满 N 条自动真清空一次」—— 默认 5 条，可在「更多 → 自动清空」里改（3/5/10/关闭）。
+   为什么需要：安卓输入法（豆包/讯飞）会把**整段文字一直攒在识别框里**（实测能到 170 字），
+   框越长越容易出现"隐藏失效 / 识别从第一条开始认"的问题。
+   趁"刚存完这一条"这个状态最干净的时刻把框真正清空、把隐藏状态归零，最安全 ✓ */
+const AUTO_CLEAR_KEY = 'lighter-db-auto-clear';
+const AUTO_CLEAR_OPTS = [0, 3, 5, 10];          // 0 = 关闭
+function autoClearEvery(){
+  try{
+    const v = parseInt(localStorage.getItem(AUTO_CLEAR_KEY) || '', 10);
+    return AUTO_CLEAR_OPTS.indexOf(v) >= 0 ? v : 5;   // 没设过 → 默认每 5 条
+  }catch(e){ return 5; }
+}
+function autoClearLabel(){ const n = autoClearEvery(); return n ? ('每 ' + n + ' 条') : '关闭'; }
+function cycleAutoClear(){
+  const i = AUTO_CLEAR_OPTS.indexOf(autoClearEvery());
+  const next = AUTO_CLEAR_OPTS[(i + 1) % AUTO_CLEAR_OPTS.length];
+  try{ localStorage.setItem(AUTO_CLEAR_KEY, String(next)); }catch(e){}
+  toast(next ? ('每录满 ' + next + ' 条自动真清空一次识别框') : '已关闭自动清空');
+}
 function toggleClearMode(){
   const m = clearMode() === 'edit' ? 'hide' : 'edit';
   try{ localStorage.setItem(CLEAR_MODE_KEY, m); }catch(e){}
@@ -9197,6 +9225,20 @@ function bindSmartInput(){
             // ⭐ 关键：保存成功后立刻给识别框挂"隐藏罩" —— 停止听写时 iOS 会把刚保存的这段
             //    重新提交一遍，不盖住的话它会被自动识别**重新填进表单**、下一次又存一遍 ✗
             smartArmSavedEcho(tid, rawBefore);
+            // ⭐ 每录满 N 条**真清空**一次识别框（默认 5，可在「更多 → 自动清空」里改/关）
+            //    安卓输入法会把整段文字一直攒着（实测到 170 字），框越长越容易出
+            //    "隐藏失效 / 识别从第一条开始认"的问题；趁刚存完这一条、状态最干净时归零 ✓
+            //    ⚠️ **只在安卓上做** ✗ —— iPhone 的防重复逻辑依赖"框里累积着前几条"，
+            //    中途硬清空会打乱它（实测 `db-voice-replay4` 13 条丢 2 条）。
+            const _every = window.__isAndroid ? autoClearEvery() : 0;
+            if(_every > 0){
+              box._savedCount = (box._savedCount || 0) + 1;
+              if(box._savedCount >= _every){
+                box._savedCount = 0;
+                try{ hardClearInput(box); }catch(e){}
+                vlog('自动清空：已录满 ' + _every + ' 条 → 真清空识别框');
+              }
+            }
             // ⭐ 把"这条记录当时的原始文字"冻结下来（重播修订前版本时要用它比对），ring 清空给下一条
             _histFrozen.unshift(_histRing.slice(-20));
             _histFrozen = _histFrozen.slice(0, 3);
