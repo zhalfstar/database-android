@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-20.5</title>
+<title>轻量数据库 · v2026-10-20.6</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -204,6 +204,23 @@ nav{padding:4px 10px}
 /* 拖到卡片中央 = 松手合并成一个数据表（两个平行工作表） */
 .ov-card.drop-merge{outline:2px dashed var(--accent-hi);outline-offset:-2px;background:var(--panel2)}
 .ov-card.drop-merge::after{content:'松手合并为一个数据表';display:block;font-size:11px;color:var(--accent-hi);font-weight:400;margin-top:4px}
+/* ===== 概览多选（批量移入文件夹 / 批量删除）=====
+   为什么要它：概览的拖动是 HTML5 拖放（draggable + ondragstart/ondrop），
+   这套在**触屏上根本不触发** —— 安卓/iPad 上长按卡片拖不进文件夹（真机 2026-10-20）。
+   多选不依赖拖放，所以手机上也能把表放进文件夹 ✓ */
+.ov-card.ov-sel{position:relative;padding-left:36px;cursor:pointer}
+.ov-card .ov-cb{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:18px;height:18px;
+  border:1.5px solid var(--line2);border-radius:5px;background:var(--panel);display:flex;align-items:center;
+  justify-content:center;font-size:11px;line-height:1;color:transparent;font-weight:700}
+.ov-card.ov-sel.on{border-color:var(--accent);background:var(--accent-soft)}
+.ov-card.ov-sel.on .ov-cb{background:var(--accent);border-color:var(--accent);color:#fff}
+.ov-selbar{position:fixed;left:0;right:0;bottom:0;z-index:60;display:flex;align-items:center;gap:8px;
+  padding:10px 12px calc(10px + env(safe-area-inset-bottom, 0px));background:var(--panel);
+  border-top:1px solid var(--line);box-shadow:0 -4px 18px rgba(15,23,42,.10)}
+.ov-selbar .n{font-size:13px;font-weight:600;margin-right:auto;white-space:nowrap}
+.ov-selbar button:disabled{opacity:.45;pointer-events:none}
+@media (max-width:520px){ .ov-selbar{gap:6px;padding:8px 8px calc(8px + env(safe-area-inset-bottom, 0px))}
+  .ov-selbar .btn{padding:8px 10px;font-size:12.5px} }
 /* 工作表页签拖动排序 / 拖出拆分 */
 .sheet-tab.dragging{opacity:.45}
 .sheet-tab.drop-before{box-shadow:inset 2px 0 0 var(--accent-hi)}
@@ -932,7 +949,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-20.5">v2026-10-20.5</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-20.6">v2026-10-20.6</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -2011,6 +2028,8 @@ function route(){
 function render(){
   syncAppShift();
   const r = parseHash();
+  // 概览多选只在概览/文件夹页有效：切到别的视图就退出（否则底部操作条会跟着跑到表格页）
+  if(_ovSel && r.view!=='overview' && r.view!=='folder') _ovSel = null;
   const t = r.view==='table' ? db.tables.find(x=>x.id===r.id) : null;
   const vw = $('view'); if(vw) vw.classList.remove('table-page');
   document.body.classList.remove('table-page-body');
@@ -2025,6 +2044,7 @@ function render(){
   }
   renderSidebar();
   route();
+  ovSelBar();          // 多选底部操作条：进入/退出/计数都靠它同步
 }
 function onTableSearch(v){
   const r = parseHash();
@@ -2180,7 +2200,10 @@ function renderOverview(){
   const folders = [...db.folders].sort((a,b)=>(a.order??0)-(b.order??0));
   // 只列工作簿头：一个工作簿在概览里只占一张卡片（点进去用顶部页签切换工作表）
   const ts = db.tables.filter(isBookHead);
-  const cardOf = t => `<a class="tbl-card ov-card" draggable="true" href="#/table/${encodeURIComponent(t.id)}" data-id="${t.id}" ondragstart="dragTableStart(this,event)" ondragover="dragTableOver(this,event)" ondragleave="dragTableLeave(this)" ondrop="dragTableDrop(this,event,'${t.id}')" ondragend="dragTableEnd()" title="点击进入 · 拖动调整顺序 · 长按改名">${esc(bookNameOf(t))}${bookSheets(t).length>1?`<span class="ov-card-sheets">${bookSheets(t).length} 个工作表</span>`:''}</a>`;
+  const cardOf = t => {
+    const sel = !!(_ovSel && _ovSel.has(t.id));
+    return `<a class="tbl-card ov-card${_ovSel?' ov-sel':''}${sel?' on':''}" draggable="${_ovSel?'false':'true'}" href="#/table/${encodeURIComponent(t.id)}" data-id="${t.id}" ondragstart="dragTableStart(this,event)" ondragover="dragTableOver(this,event)" ondragleave="dragTableLeave(this)" ondrop="dragTableDrop(this,event,'${t.id}')" ondragend="dragTableEnd()" onclick="return ovSelClick(event,this)" title="${_ovSel?'点击选中 / 再点取消':'点击进入 · 拖动调整顺序 · 长按改名'}">${_ovSel?'<span class="ov-cb">✓</span>':''}${esc(bookNameOf(t))}${bookSheets(t).length>1?`<span class="ov-card-sheets">${bookSheets(t).length} 个工作表</span>`:''}</a>`;
+  };
   // 每个文件夹块按各自的偏好渲染（scope = 文件夹 id，未分类用 __ungrouped__）
   const group = fid => ovItemsHTML(ovSortTables(ts.filter(t=>(t.folderId||null)===(fid||null)), fid), cardOf, fid);
   // 文件夹默认「展开」：折叠态会把里面的表格卡片整个 display:none 掉，
@@ -2201,7 +2224,7 @@ function renderOverview(){
     </div>`;
   $('view').innerHTML = `
    <div class="view-head ov">
-     <div class="view-actions"><button class="btn sm" onclick="openHelp()" title="操作指南">${svg('i-info')} 操作指南</button><button class="btn sm" onclick="openUndoList()" title="撤销历史">${svg('i-restore')} 撤销</button><button class="btn primary sm" onclick="openCreateTable()">${svg('i-plus')} 新建数据表</button></div>
+     <div class="view-actions"><button class="btn sm" onclick="ovSelStart()" title="多选：批量移入文件夹 / 批量删除">${svg('i-check')} 选择</button><button class="btn sm" onclick="openHelp()" title="操作指南">${svg('i-info')} 操作指南</button><button class="btn sm" onclick="openUndoList()" title="撤销历史">${svg('i-restore')} 撤销</button><button class="btn primary sm" onclick="openCreateTable()">${svg('i-plus')} 新建数据表</button></div>
    </div>
    ${(ts.length || folders.length) ? `
    <div class="panel">
@@ -2227,7 +2250,10 @@ function renderFolderView(fid){
   const f = isUngrouped ? {id:'__ungrouped__', name:'未分类'} : db.folders.find(x=>x.id===fid);
   if(!f){ location.hash = '#/overview'; return; }
   const ts = db.tables.filter(t=> (isUngrouped ? !t.folderId : t.folderId===fid)).filter(isBookHead);
-  const cardOf = t => `<a class="tbl-card ov-card fov-card" href="#/table/${encodeURIComponent(t.id)}" data-id="${t.id}" title="点击进入 · 长按改名">${esc(bookNameOf(t))}${bookSheets(t).length>1?`<span class="ov-card-sheets">${bookSheets(t).length} 个工作表</span>`:''}</a>`;
+  const cardOf = t => {
+    const sel = !!(_ovSel && _ovSel.has(t.id));
+    return `<a class="tbl-card ov-card fov-card${_ovSel?' ov-sel':''}${sel?' on':''}" href="#/table/${encodeURIComponent(t.id)}" data-id="${t.id}" onclick="return ovSelClick(event,this)" title="${_ovSel?'点击选中 / 再点取消':'点击进入 · 长按改名'}">${_ovSel?'<span class="ov-cb">✓</span>':''}${esc(bookNameOf(t))}${bookSheets(t).length>1?`<span class="ov-card-sheets">${bookSheets(t).length} 个工作表</span>`:''}</a>`;
+  };
   const actions = `
        <button class="btn sm" onclick="location.hash='#/overview'">${svg('i-back')} 返回概览</button>
        ${isUngrouped ? '' : `<button class="btn sm" onclick="openRenameFolder('${f.id}')">${svg('i-edit')} 重命名</button>`}
@@ -2301,6 +2327,118 @@ function bindFolderCardLongPress(){
     card.addEventListener('pointerleave', cancel);
     card.addEventListener('pointercancel', cancel);
     card.addEventListener('contextmenu', e=>{ e.preventDefault(); e.stopPropagation(); showTableCardMenu(card, e); });
+  });
+}
+/* ===== 概览多选：批量移入文件夹 / 批量删除 =====
+   为什么需要它：概览的拖动用的是 **HTML5 拖放**（draggable + ondragstart/ondrop），
+   这套在**触屏上根本不触发** —— 安卓/iPad 上长按卡片拖不进文件夹（真机 2026-10-20 反馈）。
+   多选不依赖拖放，所以手机上也能一次把好几个表放进文件夹 ✓
+   进入方式：概览右上「选择」，或长按卡片 →「☑ 多选（批量移动/删除）」 */
+let _ovSel = null;            // null = 普通模式；Set<表头 id> = 多选模式
+function ovSelOn(){ return !!_ovSel; }
+function ovSelStart(id){
+  _ovSel = new Set();
+  if(id) _ovSel.add(id);
+  const r = parseHash();
+  if(r.view !== 'overview' && r.view !== 'folder') location.hash = '#/overview';
+  render();
+  ovSelBar();
+}
+function ovSelEnd(){ _ovSel = null; render(); }
+/* 卡片点击：多选模式下切换选中（返回 false 阻止 <a> 跳转）；普通模式下放行 ✓ */
+function ovSelClick(ev, el){
+  if(!_ovSel) return true;
+  if(ev){ ev.preventDefault(); ev.stopPropagation(); }
+  const id = (el && el.dataset) ? el.dataset.id : '';
+  if(!id) return false;
+  if(_ovSel.has(id)) _ovSel.delete(id); else _ovSel.add(id);
+  el.classList.toggle('on', _ovSel.has(id));
+  ovSelBar();
+  return false;
+}
+/* 底部操作条：进入/退出/计数都由它同步（render() 每次结尾都会调） */
+function ovSelBar(){
+  let b = document.getElementById('ov-selbar');
+  if(!_ovSel){ if(b) b.remove(); return; }
+  if(!b){
+    b = document.createElement('div');
+    b.id = 'ov-selbar';
+    b.className = 'ov-selbar';
+    b.innerHTML = '<span class="n"></span>'
+      + '<button type="button" class="btn sm" onclick="ovSelMove()">' + svg('i-folder') + ' 移入文件夹</button>'
+      + '<button type="button" class="btn sm danger" onclick="ovSelDelete()">' + svg('i-trash') + ' 删除</button>'
+      + '<button type="button" class="btn sm ghost" onclick="ovSelEnd()">取消</button>';
+    document.body.appendChild(b);
+  }
+  const n = b.querySelector('.n');
+  if(n) n.textContent = '已选 ' + _ovSel.size + ' 项';
+  b.querySelectorAll('button').forEach(bt=>{ bt.disabled = _ovSel.size === 0; });
+}
+/* 移入文件夹：弹出文件夹列表（含"未分类" + 就地新建） */
+function ovSelMove(){
+  if(!_ovSel || !_ovSel.size) return;
+  const rows = [{id:'', name:'未分类'}].concat((db.folders||[]).map(f=>({id:f.id, name:f.name})));
+  window._ovMoveRows = rows;
+  const list = rows.map((r,i)=>'<button type="button" class="btn ghost" style="width:100%;justify-content:flex-start;margin-bottom:6px" onclick="ovSelMoveToIdx(' + i + ')">'
+      + svg(r.id ? 'i-folder' : 'i-db') + esc(r.name) + '</button>').join('');
+  openModal('<div class="modal small">'
+    + '<div class="modal-head"><h2>移入文件夹</h2><button type="button" class="icon-btn" onclick="closeModal()">' + svg('i-x') + '</button></div>'
+    + '<div class="modal-body" style="padding:12px 16px;max-height:60vh;overflow-y:auto">'
+    + '<p class="muted" style="font-size:12.5px;margin:0 0 10px">把选中的 <b>' + _ovSel.size + '</b> 个数据表移入：</p>'
+    + list
+    + '<div style="display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)">'
+    + '<input id="ov-newfolder" class="in" style="flex:1" placeholder="新文件夹名称" autocomplete="off">'
+    + '<button type="button" class="btn sm primary" onclick="ovSelNewFolder()">新建并移入</button></div>'
+    + '</div></div>');
+}
+function ovSelMoveToIdx(i){
+  const r = (window._ovMoveRows || [])[i];
+  if(r) ovSelMoveTo(r.id);
+}
+function ovSelMoveTo(fid){
+  const ids = [...(_ovSel || [])];
+  if(!ids.length) return;
+  ids.forEach(id=>{
+    const t = db.tables.find(x=>x.id===id); if(!t) return;
+    const bid = bookIdOf(t);
+    // 整本书一起移动：卡片代表"工作簿"，只改表头会让其它工作表的 folderId 留在原处
+    db.tables.filter(x=>bookIdOf(x)===bid).forEach(x=>{ x.folderId = fid || null; });
+  });
+  const nm = fid ? (((db.folders.find(f=>f.id===fid)||{}).name) || '') : '未分类';
+  save(); closeModal(); _ovSel = null; render();
+  toast('已把 ' + ids.length + ' 个数据表移到「' + nm + '」');
+}
+function ovSelNewFolder(){
+  const inp = document.getElementById('ov-newfolder');
+  const name = inp ? String(inp.value || '').trim() : '';
+  if(!name){ toast('请输入文件夹名称'); return; }
+  db.folders = db.folders || [];
+  if(db.folders.some(f=>f.name === name)){ toast('已有同名文件夹'); return; }
+  const f = { id: uid(), name: name, order: db.folders.length };
+  db.folders.push(f);
+  ovSelMoveTo(f.id);
+}
+/* 批量删除：整本书一起进回收站（可恢复） */
+function ovSelDelete(){
+  const ids = [...(_ovSel || [])];
+  if(!ids.length) return;
+  const names = ids.map(id=>{ const t = db.tables.find(x=>x.id===id); return t ? bookNameOf(t) : ''; }).filter(Boolean);
+  confirmDialog('确定删除选中的 <b>' + ids.length + '</b> 个数据表吗？<br>'
+    + names.slice(0, 8).map(esc).join('、') + (names.length > 8 ? ' 等' : '')
+    + '<br><span class="muted" style="font-size:12px">删除后整表进入回收站，可随时恢复</span>', function(){
+    db.trash = db.trash || [];
+    ids.forEach(id=>{
+      const t = db.tables.find(x=>x.id===id); if(!t) return;
+      const bid = bookIdOf(t);
+      db.tables.filter(x=>bookIdOf(x)===bid).forEach(x=>{
+        db.trash.push({ id: uid(), tableId: x.id, tableName: x.name, deletedAt: Date.now(),
+          rows: x.rows, fields: x.fields, view: x.view || {}, folderId: x.folderId || null, bookId: x.bookId || '' });
+        delete ui.tableQuery[x.id];
+      });
+      db.tables = db.tables.filter(x=>bookIdOf(x)!==bid);
+    });
+    save(); closeModal(); _ovSel = null; render();
+    toast('已删除 ' + ids.length + ' 个数据表，可到回收站恢复');
   });
 }
 let dragTableId = null;
@@ -2603,6 +2741,7 @@ function showTableCardMenu(cardEl, ev){
     r.appendChild(b);
     menu.appendChild(r);
   }
+  addBtn('☑ 多选（批量移动/删除）', function(){ ovSelStart(tableId); });
   addBtn('重命名/设置', function(){ openRenameTable(tableId); });
   addBtn('分享此表', function(){ shareSingleTable(tableId); });
   addBtn('删除此表', function(){
@@ -5102,6 +5241,7 @@ function openHelp(){
     '<h3 style="margin:0 0 8px">基础操作</h3>'+
     '<p style="margin:4px 0;font-size:13px">• <b>点击数据表卡片</b>：进入表查看记录</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>长按数据表卡片</b>：重命名、分享、删除</p>'+
+    '<p style="margin:4px 0;font-size:13px">• <b>批量整理（多选）</b>：概览右上角点「<b>选择</b>」，或长按卡片选「☑ 多选（批量移动/删除）」，每张卡片前会出现复选框。勾好几张后，用底部操作条<b>一次移入某个文件夹</b>（也可就地新建文件夹）或<b>一次删除</b>（进回收站可恢复）。<b>手机上没有"拖进文件夹"</b>——拖动用的是电脑浏览器的拖放功能，触屏上不生效，用这个「移入文件夹」即可，效果一样</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>拖动数据表卡片</b>：调整顺序或归类到文件夹</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>新建时可套模板</b>：新建数据表弹窗里选「从模板开始」，内置读书清单、记账、客户名单、库存管理、健身记录、待办清单；库存模板还自带一条「数量 &lt; 10 标红」的条件格式</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>长按文件夹</b>（标题行或块内任意位置都行，手机上更好按）：弹出菜单 —— <b>修改文件夹名称</b>、新建文件夹、查看方式、排序</p>'+
@@ -5172,7 +5312,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-20.5</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-20.6</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
