@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-20.8</title>
+<title>轻量数据库 · v2026-10-20.9</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -522,6 +522,16 @@ th.sorted{color:var(--accent-hi)}
 .fm-ctl{flex:1;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:6px;padding:5px 8px;font-size:12.5px;outline:none;font-family:inherit;min-width:0}
 .fm-ctl:focus{border-color:var(--accent)}
 .fm-clear{margin-left:auto;color:var(--accent-hi);text-decoration:underline;background:none;border:none;cursor:pointer;font-size:12px;font-family:inherit;padding:0}
+/* 格式面板的拖动把手 —— 面板里几乎全是下拉框/按钮，以前能拖的只有一行小标题，
+   手机上"抓不住、拖不动"（真机 2026-10-20："拖动特别费劲"）。
+   现在给它一条明显的把手：整行可拖、带握把图标、touch-action:none 交给脚本处理 ✓ */
+.fm-drag{display:flex;align-items:center;gap:6px;font-weight:600;font-size:13.5px;margin:0 0 10px;
+  padding:8px 6px;border-radius:8px;cursor:move;touch-action:none;
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;color:var(--text)}
+.fm-drag:active{background:var(--line)}
+.fm-drag svg{width:14px;height:14px;color:var(--muted);flex:none}
+.fm-drag .fm-drag-hint{margin-left:auto;font-weight:400;font-size:11px;color:var(--muted)}
+@media (max-width:768px){ .fm-drag{padding:10px 8px;min-height:40px;margin-bottom:8px} }
 /* 手机上把格式面板的控件放大 —— 原来「左/中/右」只有 32×26（安卓建议触摸目标 ≥44），
    手指稍一偏就落进按钮之间的空隙，什么都不会发生，用户感知就是"点了没反应" ✗ */
 @media (max-width:768px){
@@ -546,6 +556,14 @@ td.num,th.num{text-align:right}
    它是写死的白底，而文字颜色会跟着主题走 ✗，深色模式下就成了"浅字白底"看不见 ✗。
    单元格自己的格式颜色是**内联样式**，优先级更高，仍然生效 ✓ */
 #preview-body{color:#111}
+/* 预览的滚动条：手机上原生滚动条只有 2~3px（还是浮层），手指根本抓不住 ✗
+   这里换成"粗一点、有轨道、有对比"的经典滚动条，好抓也好拖 ✓ */
+#preview-body{overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:auto}
+#preview-body::-webkit-scrollbar{width:14px;height:14px}
+#preview-body::-webkit-scrollbar-track{background:#eef1f5;border-radius:8px}
+#preview-body::-webkit-scrollbar-thumb{background:#b9c2cd;border:3px solid #eef1f5;border-radius:8px;min-height:40px}
+#preview-body::-webkit-scrollbar-thumb:active{background:#8e99a6}
+#preview-body::-webkit-scrollbar-corner{background:#eef1f5}
 #preview-body *{color:#111}
 .sig-preview{border:1px solid var(--line2);border-radius:8px;background:var(--panel);height:56px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden}
 .sig-preview img{max-width:100%;max-height:100%}
@@ -949,7 +967,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-20.8">v2026-10-20.8</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-20.9">v2026-10-20.9</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -1467,28 +1485,35 @@ function makeFloat(el, key, opts){
     const prevTA = el.style.touchAction;
     el.style.touchAction = 'none';
     el._dragging = true;
+    let rafId = 0, dx0 = 0, dy0 = 0;
+    const applyMove = ()=>{
+      rafId = 0;
+      if(!moved) return;
+      // 夹取边界同样按「布局视口」表达（与上面 ox/oy、style.left/top 同一坐标系）：
+      // 可见区在布局坐标里是 [vOffL, vOffL+vW] x [vOffT, vOffT+vH]。
+      // 用 window.innerHeight 会在 iOS 上算得过大（innerHeight 不随键盘变），
+      // 把弹窗拖到键盘背后；只保证「至少 48px 留在可视区内」，不用整窗夹取。
+      const vv = window.visualViewport;
+      const vL = (vv && vv.offsetLeft) || 0, vT = (vv && vv.offsetTop) || 0;
+      const vW = (vv && vv.width)  || window.innerWidth;
+      const vH = (vv && vv.height) || window.innerHeight;
+      const keep = 48;
+      const minL = vL + 4, maxL = Math.max(minL, vL + vW - keep);
+      const minT = vT + 4, maxT = Math.max(minT, vT + vH - keep);
+      el.style.left = Math.max(minL, Math.min(maxL, ox + dx0))+'px';
+      el.style.top = Math.max(minT, Math.min(maxT, oy + dy0))+'px';
+    };
     const move = ev=>{
-      const dx = ev.clientX - sx, dy = ev.clientY - sy;
-      if(Math.abs(dx)+Math.abs(dy) > 4) moved = true;
-      if(moved){
-        // 夹取边界同样按「布局视口」表达（与上面 ox/oy、style.left/top 同一坐标系）：
-        // 可见区在布局坐标里是 [vOffL, vOffL+vW] x [vOffT, vOffT+vH]。
-        // 用 window.innerHeight 会在 iOS 上算得过大（innerHeight 不随键盘变），
-        // 把弹窗拖到键盘背后；只保证「至少 48px 留在可视区内」，不用整窗夹取。
-        const vv = window.visualViewport;
-        const vL = (vv && vv.offsetLeft) || 0, vT = (vv && vv.offsetTop) || 0;
-        const vW = (vv && vv.width)  || window.innerWidth;
-        const vH = (vv && vv.height) || window.innerHeight;
-        const keep = 48;
-        const minL = vL + 4, maxL = Math.max(minL, vL + vW - keep);
-        const minT = vT + 4, maxT = Math.max(minT, vT + vH - keep);
-        el.style.left = Math.max(minL, Math.min(maxL, ox + dx))+'px';
-        el.style.top = Math.max(minT, Math.min(maxT, oy + dy))+'px';
-      }
+      dx0 = ev.clientX - sx; dy0 = ev.clientY - sy;
+      if(Math.abs(dx0)+Math.abs(dy0) > 4) moved = true;
+      // ⭐ 每帧最多写一次 left/top：一次触摸常在同一帧里派发好几个 pointermove，
+      //    每个都写一次会触发多次 layout + 重绘（面板还有大阴影）→ 手机上拖动"一顿一顿" ✗
+      if(moved && !rafId) rafId = requestAnimationFrame(applyMove);
     };
     const up = ()=>{
       // pointerup / pointercancel 都可能先到，只处理一次
       if(done) return; done = true;
+      if(rafId){ cancelAnimationFrame(rafId); applyMove(); }   // 把最后一帧补上，别停在半路
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
@@ -4307,6 +4332,24 @@ function openPreview(tableId){
   // pinch zoom
   const body = document.getElementById('preview-body');
   const content = document.getElementById('preview-content');
+  // ⭐ 手机上先按「适合宽度」打开 —— A4 纸宽 297mm≈1122px，手机屏才 400 左右，
+  //    不缩就得横向滚动，而安卓的滚动条是**浮层**（2~3px，样式改不动、手指抓不住）
+  //    （真机 2026-10-20："预览的滚动条很难触摸到"）。
+  //    用 `zoom` 而不是 `transform`：zoom 会把**布局尺寸一起缩**，缩完就没有横向滚动了 ✓
+  requestAnimationFrame(()=>{
+    try{
+      const cs = getComputedStyle(body);
+      // clientWidth 含 padding，要减掉左右内边距才是真正可用的宽度（否则算出来还是超出）
+      const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0);
+      const avail = body.clientWidth - padX - 6;
+      const cw = content.offsetWidth || 0;
+      if(cw > avail && avail > 80){
+        const s = Math.max(0.3, avail / cw);
+        previewScale = s;
+        content.style.zoom = s;
+      }
+    }catch(e){}
+  });
   let initialDist = 0;
   let initialScale = 1;
   body.addEventListener('touchstart', e=>{
@@ -5312,7 +5355,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-20.8</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-20.9</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -6381,7 +6424,7 @@ function openFormatPanel(tableId, rowId, fieldId){
     + t.fields.filter(f=>f.hidden!==true).map(f=>'<option value="'+f.id+'"'+(f.id===fieldId?' selected':'')+'>'+esc(f.name)+'</option>').join('')
     + '</select></div>';
   panel.innerHTML = `
-    <div style="font-weight:600;margin-bottom:8px">格式设置</div>
+    <div class="fm-drag">${svg('i-more')}格式设置<span class="fm-drag-hint">按住可拖动</span></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <div><span class="fm-label">应用</span>
         <select class="fm-ctl" style="width:100%" onchange="changeFormatTarget('${tableId}','${rowId}','${fieldId}',this.value)">
