@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-20.6</title>
+<title>轻量数据库 · v2026-10-20.7</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -949,7 +949,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-20.6">v2026-10-20.6</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-20.7">v2026-10-20.7</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -5312,7 +5312,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-20.6</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-20.7</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -7851,7 +7851,17 @@ function quickEditLast(tableId, rowId){
           和"脚本直接改 value"不是一回事，最不容易打断 iOS 听写 —— 但也不是 100% 保证。
    hide = 保留隐藏：一个字都不写，只全选 + 用镜像层盖住（已验证不打断听写 ✓，但旧文字还在框里）。 */
 const CLEAR_MODE_KEY = 'lighter-db-clear-mode';
-function clearMode(){ try{ return localStorage.getItem(CLEAR_MODE_KEY) === 'hide' ? 'hide' : 'edit'; }catch(e){ return 'edit'; } }
+function clearMode(){
+  try{
+    const v = localStorage.getItem(CLEAR_MODE_KEY);
+    if(v === 'hide' || v === 'edit') return v;      // 用户明确选过就听用户的
+    // 没设过时的默认值：安卓用「保留隐藏」——
+    // 真机日志实证（2026-10-20）：安卓上「直接抹掉」要在输入法**正在合成**的时候改写输入框，
+    // 每次保存后输入法都会重新开始一次合成（compositionstart），听写被打断 ✗
+    // 「保留隐藏」一个字都不改、只在视觉上盖住，最不容易打断听写 ✓
+    return window.__isAndroid ? 'hide' : 'edit';
+  }catch(e){ return 'edit'; }
+}
 function clearModeLabel(){ return clearMode() === 'edit' ? '直接抹掉' : '保留隐藏'; }
 function toggleClearMode(){
   const m = clearMode() === 'edit' ? 'hide' : 'edit';
@@ -9096,12 +9106,9 @@ function bindSmartInput(){
       if(!enterGate(tid, uid)) return;              // 短时间内的第二次「回车」→ 直接丢弃
       const beforeSig = form ? (form.dataset.baseSig || '') : '';
       const rawBefore = box.value || '';            // 保存前框里的原文（保存后要拿它挂"隐藏罩"）
-      smartNoteHandled(box, smartBoxText(box));     // 记下"这批已处理"（要在清空之前取）
-      clearInputKeepVoice(box);
-      box._tailUntil = Date.now() + 1500;           // 保存后听写尾巴常会带一个句号过来，自动清掉
-      box._clearAt = Date.now();
+      const handledText = smartBoxText(box);        // 先取文字；**先别**记"已处理"（这次可能不保存）
       if(tid){
-        const filled = runSmartFill(tid, keep);   // 用去掉"回车"后的文字识别（框已清，只能从参数传）
+        const filled = runSmartFill(tid, keep);   // 用去掉"回车"后的文字识别（框还没清，从参数传）
         const sigNow = recordFormSignature(tid);
         // ⭐ 识别不到任何内容时**不保存** ✗ —— 除非表单是用户**手动**填的。
         //    真机日志实证：`待识别=len=0 ""` 紧接着却是 `保存后：已给识别框挂上隐藏罩`
@@ -9112,10 +9119,18 @@ function bindSmartInput(){
         const manualFilled = form && form.dataset.autoFilled !== '1';
         if(filled <= 0 && !(manualFilled && beforeSig && beforeSig !== sigNow)){
           vlog('回车：识别不到新内容 → 不保存（表单未手填）');
+          // ⭐ 这里**不清空、也不记"已处理"** ✗ —— 原来是"先清空、再判断"：一旦「回车」没识别出内容
+          //    （安卓上很常见：只识别出一个句号），框里的话被抹掉不说，输入法还会因为输入框被改写
+          //    而重启合成 → **听写直接断掉**（真机 2026-10-20：说了回车只得到"。"，框清空 + 语音停止）。
+          //    现在把话留在框里，用户可以直接接着说 ✓
           toast('没有识别到内容，已跳过（要强制保存请点「添加记录」）');
           enterGateClear();               // 这次没保存，放开闸门 —— 别让"空回车"挡住紧接着的正常回车
           return;
         }
+        smartNoteHandled(box, handledText);           // 记下"这批已处理"（要在清空之前取）
+        clearInputKeepVoice(box);
+        box._tailUntil = Date.now() + 1500;           // 保存后听写尾巴常会带一个句号过来，自动清掉
+        box._clearAt = Date.now();
         // ⚠️ 这里**没有**"内容与刚保存的那条一样就跳过"的判断 ✗ ——
         //    表单签名只包含"被自动识别到的字段"，如果表里只有姓名字段能被识别，
         //    那么"张三 买书 / 张三 买笔"两条的签名**完全一样** → 第二条会被误杀，
