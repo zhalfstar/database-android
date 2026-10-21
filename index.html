@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-21.4</title>
+<title>轻量数据库 · v2026-10-21.5</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -980,7 +980,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-21.4">v2026-10-21.4</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-21.5">v2026-10-21.5</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -1147,18 +1147,24 @@ function dragColOver(el, ev){
   el.classList.add('drop-col');
 }
 function dragColLeave(el){ el.classList.remove('drop-col'); }
-function dragColDrop(el, ev, tableId, fieldId){
-  if(ev && ev.preventDefault) ev.preventDefault();
-  if(!dragCol || dragCol.fieldId===fieldId){ dragColEnd(el); return; }
-  const t = db.tables.find(x=>x.id===tableId); if(!t){ dragColEnd(el); return; }
+/* 把某一列移到另一列的位置（拖放和触屏拖动共用）。
+   fromFid === toFid、或碰到编号列（__no__）时不动。 */
+function moveFieldTo(tableId, fromFid, toFid){
+  const t = db.tables.find(x=>x.id===tableId); if(!t) return false;
   const fields = t.fields;
-  const from = fields.findIndex(f=>f.id===dragCol.fieldId);
-  const to = fields.findIndex(f=>f.id===fieldId);
-  if(from<0 || to<0){ dragColEnd(el); return; }
+  const from = fields.findIndex(f=>f.id===fromFid);
+  const to = fields.findIndex(f=>f.id===toFid);
+  if(from < 0 || to < 0 || from === to) return false;
   const moved = fields.splice(from,1)[0];
   fields.splice(to,0,moved);
   t.updatedAt = Date.now();
   save(); render();
+  return true;
+}
+function dragColDrop(el, ev, tableId, fieldId){
+  if(ev && ev.preventDefault) ev.preventDefault();
+  if(!dragCol || dragCol.fieldId===fieldId){ dragColEnd(el); return; }
+  moveFieldTo(tableId, dragCol.fieldId, fieldId);
   dragColEnd(el);
 }
 function dragColEnd(){
@@ -4720,33 +4726,72 @@ function bindGridLongPress(tableId){
   ths.forEach(th=>{
     if(th._lpBound) return;
     th._lpBound = true;
-    let t = null, startY = 0, startX = 0;
-    th.addEventListener('pointerdown', e=>{
-      if(e.pointerType === 'mouse') return; // mouse uses right-click
-      startY = e.clientY; startX = e.clientX;
+    /* 表头的三种触屏操作（真机 2026-10-21 反馈"长按表头或拖动表头没反应"）：
+       ① 短按      → 交给 bindThTap（双击开排序筛选）
+       ② 长按 550ms → 弹出「列操作」菜单（插入列 / 删除此列 / 列宽）
+       ③ 长按后**继续移动** → 拖动换列（触屏上 HTML5 拖放完全不触发，只能自己实现）
+       为什么用 touch 事件而不是 pointer：拖拽阶段必须 preventDefault 才能不让浏览器
+       把这串手势当成滚动（否则会 pointercancel，拖动中途断掉）。 */
+    let t = null, sx = 0, sy = 0, armed = false, dragging = false, fid = '';
+    const clearHL = ()=> document.querySelectorAll('#grid thead .th-main.drop-col').forEach(x=>x.classList.remove('drop-col'));
+    const cleanup = ()=>{ clearHL(); th.classList.remove('dragging'); dragging = false; armed = false; };
+    const fidOf = ()=> (th.closest('th') && th.closest('th').dataset.fid) || '__no__';
+
+    th.addEventListener('touchstart', e=>{
+      const p = e.touches[0]; if(!p) return;
+      sx = p.clientX; sy = p.clientY; armed = false; dragging = false;
+      fid = fidOf();
+      if(t) clearTimeout(t);
       t = setTimeout(()=>{
-        th._lpFired = true;
-        const fid = th.closest('th')?.dataset?.fid || '__no__';
-        window._lastTouch = { clientX: startX, clientY: startY };
+        t = null; armed = true;
+        window._lastTouch = { clientX: sx, clientY: sy };
         showColMenu(th, tableId, fid);
       }, 550);
+    }, {passive:true});
+
+    th.addEventListener('touchmove', e=>{
+      const p = e.touches[0]; if(!p) return;
+      if(t){
+        if(Math.abs(p.clientX-sx) > 8 || Math.abs(p.clientY-sy) > 8){ clearTimeout(t); t = null; }
+        return;
+      }
+      if(!armed) return;
+      if(!dragging){
+        if(Math.abs(p.clientX-sx) <= 14 && Math.abs(p.clientY-sy) <= 14) return;
+        dragging = true;
+        closeFieldMenu();                    // 长按弹出的菜单让位给拖动
+        th.classList.add('dragging');
+      }
+      e.preventDefault();                    // ⚠️ 必须（非 passive 监听）否则手势会被浏览器判成滚动
+      clearHL();
+      const el = document.elementFromPoint(p.clientX, p.clientY);
+      const target = el && el.closest('#grid thead th');
+      if(target && (target.dataset.fid || '__no__') !== fid){
+        const tm = target.querySelector('.th-main'); if(tm) tm.classList.add('drop-col');
+      }
+    }, {passive:false});
+
+    th.addEventListener('touchend', e=>{
+      if(t){ clearTimeout(t); t = null; return; }     // 短按：交给双击逻辑
+      if(dragging){
+        const p = e.changedTouches[0];
+        let toFid = '';
+        if(p){
+          const el = document.elementFromPoint(p.clientX, p.clientY);
+          const target = el && el.closest('#grid thead th');
+          toFid = target ? (target.dataset.fid || '__no__') : '';
+        }
+        const from = fid;
+        cleanup();
+        if(toFid && toFid !== from && from !== '__no__' && toFid !== '__no__') moveFieldTo(tableId, from, toFid);
+        return;
+      }
+      cleanup();                                      // 长按松手：菜单已经开着
     });
-    const cancel = ()=>{ if(t){ clearTimeout(t); t=null; } };
-    th.addEventListener('pointermove', e=>{
-      const dy = Math.abs(e.clientY - startY);
-      const dx = Math.abs(e.clientX - startX);
-      if(dy > 8 || dx > 8) cancel();
-    });
-    th.addEventListener('pointerup', e=>{
-      if(t){ clearTimeout(t); t=null; }
-      th._lpFired = false;
-    });
+    th.addEventListener('touchcancel', ()=>{ if(t){ clearTimeout(t); t = null; } cleanup(); });
     th.addEventListener('dblclick', e=>{
-      const fid = th.closest('th')?.dataset?.fid || '__no__';
-      openFieldMenu(tableId, fid);
+      openFieldMenu(tableId, fidOf());
     });
-    th.addEventListener('pointerleave', cancel);
-    th.addEventListener('pointercancel', cancel);
   });
   // row longpress -> batch select
   const rows = grid.querySelectorAll('tbody tr[data-rid]');
@@ -4835,7 +4880,11 @@ function showRowMenu(anchorEl, tableId, rid){
     // Self-unbind once the menu has been removed, so this listener never lingers
     // and kills later menus (e.g. the filter menu opened by double-tapping a header).
     if(!document.body.contains(menu)){ document.removeEventListener('click', closeOnDoc); return; }
-    if(!menu.contains(e.target)){ closeFieldMenu(); }
+    if(menu.contains(e.target)) return;
+    // ⚠️ 长按松手时安卓会补发一个 click，**落在被长按的那个元素自己身上** —— 不能当成"点了外面" ✗
+    //    以前没有这一句：菜单刚弹出就被这一下关掉，用户看到的是"长按没反应"（真机 2026-10-21：长按表头）
+    if(anchorEl && anchorEl.contains && anchorEl.contains(e.target)) return;
+    closeFieldMenu();
   };
   setTimeout(()=>{ document.addEventListener('click', closeOnDoc); }, 300);
   menu._closeDoc = closeOnDoc;
@@ -4941,7 +4990,11 @@ function showColMenu(anchorEl, tableId, fid){
     // Self-unbind once the menu has been removed, so this listener never lingers
     // and kills later menus (e.g. the filter menu opened by double-tapping a header).
     if(!document.body.contains(menu)){ document.removeEventListener('click', closeOnDoc); return; }
-    if(!menu.contains(e.target)){ closeFieldMenu(); }
+    if(menu.contains(e.target)) return;
+    // ⚠️ 长按松手时安卓会补发一个 click，**落在被长按的那个元素自己身上** —— 不能当成"点了外面" ✗
+    //    以前没有这一句：菜单刚弹出就被这一下关掉，用户看到的是"长按没反应"（真机 2026-10-21：长按表头）
+    if(anchorEl && anchorEl.contains && anchorEl.contains(e.target)) return;
+    closeFieldMenu();
   };
   setTimeout(()=>{ document.addEventListener('click', closeOnDoc); }, 300);
 }
@@ -5426,7 +5479,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-21.4</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-21.5</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
