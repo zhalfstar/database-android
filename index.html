@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-21.3</title>
+<title>轻量数据库 · v2026-10-21.4</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -23,6 +23,7 @@
   --bg:#F5F6F8; --panel:#FFFFFF; --panel2:#F0F2F6; --line:#E4E8EF; --line2:#D3DAE4; --border:var(--line2); --hl:var(--panel2);
   --text:#202836; --muted:#66717F; --accent:#E8A33D; --accent-hi:#B5761B;
   --topbar-bg:rgba(255,255,255,.92);
+  --head-bg:#E7EBF2;   /* 弹窗/面板的标题栏底色：要和主体（--panel 白）明显分开，否则浅色下糊成一片 */
   --accent-soft:rgba(232,163,61,.14); --danger:#E5615B; --danger-hi:#C7453E; --ok:#2E9E63; --ok-hi:#1E8A54;
   --mono:ui-monospace,"Cascadia Code",Consolas,"JetBrains Mono","Sarasa Mono SC",monospace;
   --sans:"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;
@@ -35,6 +36,7 @@
   --accent:#E8A33D; --accent-hi:#F0B65C;
   --accent-soft:rgba(232,163,61,.18); --danger:#E5615B; --danger-hi:#F0796F; --ok:#3FBE7D; --ok-hi:#4FD08D;
   --topbar-bg:rgba(26,30,37,.92);
+  --head-bg:#2A313C;
   color-scheme:dark;
 }
 :root{color-scheme:light}
@@ -526,7 +528,7 @@ th.sorted{color:var(--accent-hi)}
    手机上"抓不住、拖不动"（真机 2026-10-20："拖动特别费劲"）。
    现在给它一条明显的把手：整行可拖、带握把图标、touch-action:none 交给脚本处理 ✓ */
 .fm-drag{display:flex;align-items:center;gap:6px;font-weight:600;font-size:13.5px;margin:0 0 10px;
-  padding:8px 6px;border-radius:8px;cursor:move;touch-action:none;
+  padding:8px 6px;border-radius:8px;cursor:move;touch-action:none;background:var(--head-bg);
   -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;color:var(--text)}
 .fm-drag:active{background:var(--line)}
 .fm-drag svg{width:14px;height:14px;color:var(--muted);flex:none}
@@ -662,7 +664,10 @@ input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px;cursor:po
 }
 .modal.small{max-width:400px}
 .modal-body > *{min-width:0}
-.modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 12px;border-bottom:1px solid var(--line);touch-action:none;cursor:move}
+/* 标题栏：一律给一层**浅灰底**（--panel2），和弹窗主体（--panel 白）分开 ✗
+   以前没有任何底色 → 浅色模式下标题区和表单区都是白的，整块糊在一起，
+   看起来"标题栏和背景混淆"（真机 2026-10-21）。深色模式下 --panel2 也比 --panel 亮一档，同样有层次 ✓ */
+.modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px 12px;background:var(--head-bg);border-bottom:1px solid var(--line);border-radius:13px 13px 0 0;touch-action:none;cursor:move}
 .modal-head h2{font-size:15px;font-weight:700}
 .rec-head-opts{display:flex;align-items:center;gap:12px;flex-shrink:0}
 /* 底栏左侧的开关（和表头同款 .rec-opt 样式） */
@@ -975,7 +980,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-21.3">v2026-10-21.3</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-21.4">v2026-10-21.4</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -5421,7 +5426,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-21.3</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-21.4</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
