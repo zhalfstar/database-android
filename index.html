@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-23.6</title>
+<title>轻量数据库 · v2026-10-23.7</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -983,7 +983,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-23.6">v2026-10-23.6</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-23.7">v2026-10-23.7</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -2465,6 +2465,7 @@ function ovSelBar(){
     b.className = 'ov-selbar';
     b.innerHTML = '<span class="n"></span>'
       + '<button type="button" class="btn sm" onclick="ovSelMove()">' + svg('i-folder') + ' 移入文件夹</button>'
+      + '<button type="button" class="btn sm" onclick="ovSelExport()">' + svg('i-share') + ' 导出</button>'
       + '<button type="button" class="btn sm danger" onclick="ovSelDelete()">' + svg('i-trash') + ' 删除</button>'
       + '<button type="button" class="btn sm ghost" onclick="ovSelEnd()">取消</button>';
     document.body.appendChild(b);
@@ -2493,6 +2494,13 @@ function ovSelMove(){
 function ovSelMoveToIdx(i){
   const r = (window._ovMoveRows || [])[i];
   if(r) ovSelMoveTo(r.id);
+}
+/* 多选后一起导出：把选中的工作簿（含其全部工作表）打包成一个 JSON */
+function ovSelExport(){
+  if(!_ovSel || !_ovSel.size) return;
+  const list = bookExpand([..._ovSel].map(id => (db.tables || []).find(t=>t.id === id)).filter(Boolean));
+  if(!list.length){ toast('没有可导出的数据表'); return; }
+  openExportChoice(list, '选中的数据表', '已选 ' + _ovSel.size + ' 项');
 }
 function ovSelMoveTo(fid){
   const ids = [...(_ovSel || [])];
@@ -2745,6 +2753,10 @@ function showOverviewMenu(x, y, scope){
     t.textContent = scopeName() + ' · 仅此文件夹';
     menu.appendChild(t);
     if(isRealFolder()) addRow('修改文件夹名称', false, ()=>{ closeOvMenu(); openRenameFolder(scope); });
+    if(isRealFolder()) addRow('分享 / 导出此文件夹', false, ()=>{
+      closeOvMenu();
+      openExportChoice(bookExpand(folderTables(scope)), scopeName(), '文件夹「' + scopeName() + '」');
+    });
     if(!inFolderView()) addRow('新建文件夹', false, ()=>{ closeOvMenu(); openCreateFolder(); });
     addRow('查看方式', true, ()=>renderView());
     addRow('排序', true, ()=>renderSort());
@@ -5490,7 +5502,8 @@ function openHelp(){
     '<h3 style="margin:0 0 8px">基础操作</h3>'+
     '<p style="margin:4px 0;font-size:13px">• <b>点击数据表卡片</b>：进入表查看记录</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>长按数据表卡片</b>：重命名、分享、删除</p>'+
-    '<p style="margin:4px 0;font-size:13px">• <b>批量整理（多选）</b>：概览右上角点「<b>选择</b>」，或长按卡片选「☑ 多选（批量移动/删除）」，每张卡片前会出现复选框。勾好几张后，用底部操作条<b>一次移入某个文件夹</b>（也可就地新建文件夹）或<b>一次删除</b>（进回收站可恢复）。<b>手机上没有"拖进文件夹"</b>——拖动用的是电脑浏览器的拖放功能，触屏上不生效，用这个「移入文件夹」即可，效果一样</p>'+
+    '<p style="margin:4px 0;font-size:13px">• <b>批量整理（多选）</b>：概览右上角点「<b>选择</b>」，或长按卡片选「☑ 多选（批量移动/删除）」，每张卡片前会出现复选框。勾好几张后，用底部操作条<b>一次移入某个文件夹</b>（也可就地新建文件夹）、<b>一次导出</b>（打包成一个 JSON，含各自的文件夹）、或<b>一次删除</b>（进回收站可恢复）。<b>手机上没有"拖进文件夹"</b>——拖动用的是电脑浏览器的拖放功能，触屏上不生效，用这个「移入文件夹」即可，效果一样</p>'+
+    '<p style="margin:4px 0;font-size:13px">• <b>文件夹</b>：长按文件夹标题可<b>改名</b>、<b>分享/导出整个文件夹</b>（导出会连文件夹一起带上，对方导入后自动归到同名文件夹，不会全挤到「未分类」）</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>拖动数据表卡片</b>：调整顺序或归类到文件夹</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>新建时可套模板</b>：新建数据表弹窗里选「从模板开始」，内置读书清单、记账、客户名单、库存管理、健身记录、待办清单；库存模板还自带一条「数量 &lt; 10 标红」的条件格式</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>长按文件夹</b>（标题行或块内任意位置都行，手机上更好按）：弹出菜单 —— <b>修改文件夹名称</b>、新建文件夹、查看方式、排序</p>'+
@@ -5562,7 +5575,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-23.6</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-23.7</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -10845,6 +10858,54 @@ function exportPayloadByTables(list){
   Object.keys(db.bookNames||{}).forEach(k=>{ if(bookIds.has(k)) bookNames[k] = db.bookNames[k]; });
   return { tables: list, folders: (db.folders||[]).filter(f=>folderIds.has(f.id)), xgroups, bookNames };
 }
+/* ===== 按"一批表"直接导出（文件夹 / 多选 共用） =====
+   多工作表的工作簿要把**所有工作表**一起带上，否则又变成"只导出第一张"✗ */
+function bookExpand(list){
+  const out = [], seen = new Set();
+  (list || []).forEach(t=>{
+    if(!t) return;
+    const sheets = bookSheets(t);
+    (sheets.length ? sheets : [t]).forEach(s=>{ if(s && !seen.has(s.id)){ seen.add(s.id); out.push(s); } });
+  });
+  return out;
+}
+/* 某个文件夹里的数据表（只取工作簿头，避免一本多表被重复算） */
+function folderTables(fid){
+  return (db.tables || []).filter(t=>t.folderId === fid && isBookHead(t));
+}
+/* 二选一：下载备份 / 分享出去。列表存在 window 上，按钮点了再取（避免塞进 onclick 字符串） */
+function openExportChoice(list, baseName, title){
+  const arr = (list || []).filter(Boolean);
+  if(!arr.length){ toast('没有可导出的数据表'); return; }
+  window._expList = arr;
+  window._expBase = baseName || '数据表';
+  const books = new Set(arr.map(t=>bookIdOf(t))).size;
+  openModal(`<div class="modal small">
+    <div class="modal-head"><h2>导出${title ? '：' + esc(title) : ''}</h2><button type="button" class="icon-btn" onclick="closeModal()">${svg('i-x')}</button></div>
+    <div class="modal-body" style="padding:16px">
+      <p class="muted" style="margin:-4px 0 12px;font-size:12.5px">
+        共 <b>${books}</b> 个数据表 / <b>${arr.length}</b> 个工作表，<b>连同文件夹归属</b>一起导出；对方导入后会自动归到同名文件夹。
+      </p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button type="button" class="btn ghost" onclick="doExportDirect('download')">${svg('i-download')} 下载备份</button>
+        <button type="button" class="btn primary" onclick="doExportDirect('share')">${svg('i-share')} 分享出去</button>
+      </div>
+    </div>
+  </div>`);
+}
+function doExportDirect(kind){
+  const list = window._expList || [];
+  const base = window._expBase || '数据表';
+  window._expList = null; window._expBase = null;
+  if(!list.length){ closeModal(); return; }
+  const payload = exportPayloadByTables(list);
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const fname = safeFileBase(base) + '.json';
+  closeModal();
+  if(kind === 'share'){ shareOrDownload(blob, fname, base); return; }
+  download(blob, fname);
+  toast('已开始下载 ' + fname + (isIOSDevice() ? '，请在弹出界面选择「存储到文件」' : ''));
+}
 function doExportSel(kind){
   const list = exportSelectedTables();
   if(!list.length){ toast('请至少勾选一张表'); return; }
@@ -11093,6 +11154,23 @@ function doImportSelected(){
   const newGid = g => { if(!gidMap.has(g)) gidMap.set(g, uid()); return gidMap.get(g); };
   db.bookNames = db.bookNames || {};
   db.xgroups = Array.isArray(db.xgroups) ? db.xgroups : [];
+  /* ⚠️ 文件夹归属必须一起导进来 ✗ —— `normalizeDb({tables:[...]})` 只带了表、没带 folders，
+     校验时 `folderId` 找不到对应文件夹就被置空 → 导入后全落到「未分类」（真机 2026-10-23）✗
+     做法：先按**名字**在现有库里找同文件夹，没有就新建一个，再记下 旧id→新id 的映射 ✓ */
+  const srcFolders = Array.isArray(importAll && importAll.folders) ? importAll.folders : [];
+  const folderMap = new Map();
+  db.folders = Array.isArray(db.folders) ? db.folders : [];
+  srcFolders.forEach(f=>{
+    const nm = String((f && f.name) || '').trim();
+    if(!nm || !f || !f.id) return;
+    let ex = db.folders.find(x=>String(x.name) === nm);
+    if(!ex){
+      const order = db.folders.reduce((m,x)=>Math.max(m, Number(x.order)||0), -1) + 1;
+      ex = { id: uid(), name: nm, order };
+      db.folders.push(ex);
+    }
+    folderMap.set(String(f.id), ex.id);
+  });
   list.forEach(t=>{
     let name = String(t.name||'未命名表');
     if(existing.has(name)){ let k=2; while(existing.has(name+'('+k+')')) k++; name = name+'('+k+')'; }
@@ -11111,6 +11189,8 @@ function doImportSelected(){
       if(!r.links) return;
       Object.keys(r.links).forEach(k=>{ const g = r.links[k]; if(g) r.links[k] = newGid(g); });
     });
+    // 文件夹归属：按导入文件里的 folderId 映射到（可能新建的）目标文件夹
+    if(t.folderId && folderMap.has(String(t.folderId))) nt.folderId = folderMap.get(String(t.folderId));
     db.tables.push(nt);
     added.push(name);
     if(t.id) idMap.set(String(t.id), nt.id);
