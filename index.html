@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-23.1</title>
+<title>轻量数据库 · v2026-10-23.2</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -686,6 +686,8 @@ input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px;cursor:po
 .imp-row:hover{border-color:var(--accent)}
 .imp-row input{accent-color:var(--accent);flex:none}
 .imp-name{font-size:13.5px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+/* 导入弹窗里每个表下面那行小字：这个文件的字段带不带属性 */
+.imp-name .imp-attrs{display:block;font-style:normal;font-size:11px;font-weight:400;color:var(--muted);margin-top:2px;white-space:normal}
 .imp-tools{display:flex;gap:14px;justify-content:flex-end}
 .imp-tools a{font-size:12px;color:var(--accent-hi);cursor:pointer;text-decoration:none}
 .modal-sub{padding:0 18px 14px;display:flex;justify-content:flex-end}
@@ -980,7 +982,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-23.1">v2026-10-23.1</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-23.2">v2026-10-23.2</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -1427,7 +1429,15 @@ function normalizeDb(d){
       used.add(id);
       // 白名单必须覆盖字段对象的全部持久化属性：新增字段属性时一定要同步加进来，
       // 否则 load()/undoTo()/导入 触发 normalizeDb 时会被静默剥掉（unique、货币格式曾因此丢失）
-      return { id, name: String((f && f.name)||'字段'), type: TYPE_META[f && f.type] ? f.type : 'text', options: Array.isArray(f && f.options) ? f.options.map(String).filter(x=>x.trim()!=='') : [], defaults: Array.isArray(f && f.defaults) ? f.defaults.map(String).filter(x=>x.trim()!=='') : [], required: f && f.required === true, multi: f && f.multi === false ? false : true, hidden: f && f.hidden === true, unique: f && f.unique === true, defNow: f && f.defNow === true, expr: (f && typeof f.expr === 'string') ? f.expr : '', exprMoney: f && f.exprMoney === true, curSym: (f && typeof f.curSym === 'string') ? f.curSym : '', curDec: (f && typeof f.curDec === 'number' && Number.isFinite(f.curDec)) ? f.curDec : undefined, curNeg: (f && typeof f.curNeg === 'string') ? f.curNeg : '' };
+      const fo = { id, name: String((f && f.name)||'字段'), type: TYPE_META[f && f.type] ? f.type : 'text', options: Array.isArray(f && f.options) ? f.options.map(String).filter(x=>x.trim()!=='') : [], defaults: Array.isArray(f && f.defaults) ? f.defaults.map(String).filter(x=>x.trim()!=='') : [], required: f && f.required === true, multi: f && f.multi === false ? false : true, hidden: f && f.hidden === true, unique: f && f.unique === true, defNow: f && f.defNow === true, expr: (f && typeof f.expr === 'string') ? f.expr : '', exprMoney: f && f.exprMoney === true, curSym: (f && typeof f.curSym === 'string') ? f.curSym : '', curDec: (f && typeof f.curDec === 'number' && Number.isFinite(f.curDec)) ? f.curDec : undefined, curNeg: (f && typeof f.curNeg === 'string') ? f.curNeg : '' };
+      // 白名单之外的字段属性也**原样带上**（只收基本类型）：以后再加字段属性时，
+      // 即使忘了同步白名单，导入/读盘也不会被静默剥掉 —— unique、货币格式都这么丢过一次 ✗
+      if(f && typeof f === 'object') Object.keys(f).forEach(k=>{
+        if(k in fo) return;
+        const v = f[k], tv = typeof v;
+        if(v === null || tv === 'string' || tv === 'number' || tv === 'boolean') fo[k] = v;
+      });
+      return fo;
     }).filter(f=>f.name && f.name.trim());
     const rows = (Array.isArray(t.rows)?t.rows:[]).map(r=>{
       const values = {};
@@ -5551,7 +5561,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-23.1</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-23.2</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -10956,6 +10966,29 @@ function csvToDb(text, filename){
 }
 let importCandidates = [];
 let importAll = null;
+/* 导入前先让用户看清：**这个文件里的字段到底带不带属性**。
+   为什么需要：用户报"导出的字段有设置属性，导入时属性丢失"（2026-10-23）。
+   JSON 导出是原样带走全部属性的（`normalizeDb` 的白名单覆盖 required/unique/curSym/… ），
+   但 **CSV 天生装不下属性**（只有列名和值）—— 用 CSV 导进来，字段类型和属性只能重新猜 ✗
+   所以这里把"文件里有什么"直接写出来：带属性就列出来，纯 CSV 就明说"无属性"。 */
+function importAttrSummary(t){
+  const fs = Array.isArray(t && t.fields) ? t.fields.filter(f=>f && typeof f==='object') : [];
+  const cnt = k => fs.filter(f=>f[k]).length;
+  const parts = [];
+  const req = cnt('required'), uniq = cnt('unique');
+  if(req) parts.push(req + ' 个必填');
+  if(uniq) parts.push(uniq + ' 个禁止重复');
+  const money = fs.filter(f=>f.type==='money');
+  if(money.length){
+    const sym = money[0].curSym ? money[0].curSym : '无符号';
+    parts.push(money.length + ' 个货币（' + esc(String(sym)) + '）');
+  }
+  if(fs.some(f=>(f.type==='select'||f.type==='tags') && Array.isArray(f.options) && f.options.length)) parts.push('带选项');
+  if(fs.some(f=>f.defNow)) parts.push('默认当前时间');
+  if(fs.some(f=>f.type==='formula' && f.expr)) parts.push('公式');
+  if(fs.some(f=>f.hidden)) parts.push(cnt('hidden') + ' 个隐藏字段');
+  return parts.length ? ('含 ' + parts.join(' · ')) : '无属性（只有列名和值，多半是 CSV）';
+}
 function openImportDialog(d){
   importAll = d;
   importCandidates = (Array.isArray(d.tables) ? d.tables : []).filter(t=>t && typeof t==='object' && t.name!=null);
@@ -10968,7 +11001,7 @@ function openImportDialog(d){
         ${importCandidates.map((t,i)=>`
           <label class="imp-row">
             <input type="checkbox" data-i="${i}" checked>
-            <span class="imp-name">${esc(t.name)}</span>
+            <span class="imp-name">${esc(t.name)}<em class="imp-attrs">${importAttrSummary(t)}</em></span>
             <span class="muted">${Array.isArray(t.rows)?t.rows.length:0} 条 · ${Array.isArray(t.fields)?t.fields.length:0} 个字段</span>
           </label>`).join('')}
       </div>
