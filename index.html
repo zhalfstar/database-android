@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-23.5</title>
+<title>轻量数据库 · v2026-10-23.6</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -314,7 +314,8 @@ table.grid .g-num{position:absolute;top:0;right:0;font-size:9px;line-height:1;mi
 #group-panel .gp-name{flex:1;cursor:pointer;padding:5px 6px;border-radius:6px;color:var(--text)}
 #group-panel .gp-name:hover{background:var(--panel2)}
 #group-panel .gp-del{border:none;background:#fee4e4;color:#e5484d;border-radius:6px;padding:4px 9px;font-size:12px;cursor:pointer;white-space:nowrap}
-#group-panel .gp-btns{display:flex;gap:8px;margin-top:8px}
+#group-panel .gp-btns{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+#group-panel .gp-btns button{flex:1 1 auto;min-width:64px}
 #group-panel .gp-close{flex:1;padding:6px 0;border:none;border-radius:6px;background:var(--panel2);color:var(--text);cursor:pointer}
 #group-panel .gp-dissolve{flex:1;padding:6px 0;border:1px solid #f2b8bb;border-radius:6px;background:var(--panel);color:#e5484d;cursor:pointer}
 #group-panel .gp-addlink{flex:1;padding:6px 0;border:1px solid #cfe0ff;border-radius:6px;background:var(--panel);color:#4285F4;cursor:pointer}
@@ -982,7 +983,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-23.5">v2026-10-23.5</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-23.6">v2026-10-23.6</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -5561,7 +5562,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-23.5</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-23.6</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -6434,7 +6435,8 @@ function renderGroupPanel(tableId, fieldId, gid, xg, ev, localTitle, anchorT){
     ${items}
     <div class="gp-btns">
       ${xg
-        ? `<button type="button" class="gp-dissolve" onclick="dissolveXGroup('${xg.id}',event)">解散该组</button>`
+        ? `<button type="button" class="gp-addlink" onclick="addLinkFromXGroup('${tableId}','${xg.id}',event)">增加关联</button>
+      <button type="button" class="gp-dissolve" onclick="dissolveXGroup('${xg.id}',event)">解散该组</button>`
         : `<button type="button" class="gp-addlink" onclick="addLinkFromGroup('${tableId}','${fieldId}','${gid}',event)">增加关联</button>
       <button type="button" class="gp-dissolve" onclick="dissolveGroup('${tableId}','${fieldId}','${gid}',event)">解散该组</button>`}
       <button type="button" class="gp-close" onclick="closeGroupPanel()">关闭</button>
@@ -6482,6 +6484,22 @@ function addLinkFromGroup(tableId, fieldId, gid, ev){
   if(!m){ closeGroupPanel(); return; }
   closeGroupPanel();
   startLinkPick(tableId, m.id, fieldId);
+}
+/* 跨表组"继续加成员"：以前面板里只有「解散该组」，等于没有入口 ✗（真机 2026-10-23：
+   "导入后要关联新成员，不知道怎么操作"）。
+   锚点必须选**本表里属于这一组的行** —— 同表行靠 links 认，跨表行靠 xgroups.rows 认；
+   进关联模式后 `finishLinkMode` 会沿用这个锚点已有的组，不会另起一组 ✓ */
+function addLinkFromXGroup(tableId, xgId, ev){
+  if(ev){ ev.stopPropagation(); ev.preventDefault(); }
+  const g = (db.xgroups||[]).find(x=>x.id===xgId); if(!g) return;
+  const t = db.tables.find(x=>x.id===tableId); if(!t) return;
+  const mem = (g.rows||[]).find(m=>m.t===tableId);
+  const anchor = mem ? t.rows.find(r=>r.id===mem.r) : null;
+  closeGroupPanel();
+  if(!anchor){ toast('请先长按这条记录 →「关联到其他记录」来加成员'); return; }
+  const fid = t.fields.some(f=>f.id===g.fieldId) ? g.fieldId : autoLinkField(t, anchor);
+  if(!fid){ toast('这张表没有可用字段'); return; }
+  startLinkPick(tableId, anchor.id, fid);
 }
 function dissolveGroup(tableId, fieldId, gid, ev){
   if(ev){ ev.stopPropagation(); ev.preventDefault(); }
