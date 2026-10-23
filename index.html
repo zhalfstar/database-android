@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-21.5</title>
+<title>轻量数据库 · v2026-10-23.1</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -980,7 +980,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-21.5">v2026-10-21.5</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-23.1">v2026-10-23.1</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -2901,17 +2901,64 @@ async function buildSingleTableHtml(tableId, withData){
   html = html.replace(/<script>/, '<script>'+inject+'<\/script><script>');
   return { html, name: (onlyT ? onlyT.name : '数据表') + (withData ? '_数据' : '_模板') + '.html' };
 }
+/* 概览里的一张"数据表"其实是一个**工作簿**，底下可能有好几个工作表（顶部页签切换）。
+   分享/导出必须把它们**全部**带上 —— 以前只导 `db.tables.find(id)` 那一张，
+   多工作表的工作簿就只导出了第一个 ✗（真机 2026-10-23："只能导出第一个表"） */
+function shareSheetsOf(tableId){
+  const t = db.tables.find(x=>x.id===tableId);
+  if(!t) return [];
+  const s = bookSheets(t);
+  return s.length ? s : [t];
+}
+function safeFileBase(s){
+  return String(s == null ? '' : s).replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim() || '数据表';
+}
+function shareBookName(t){
+  return safeFileBase(bookNameOf(t) || (t && t.name) || '数据表');
+}
+/* 一次给出多个文件：能多文件分享就一起分享，否则依次下载。
+   工作簿里有 N 个工作表时 CSV/PDF 各出一个文件，走这里 ✓ */
+function shareMany(items, title){
+  const list = (items || []).filter(x=>x && x.blob);
+  if(!list.length) return;
+  if(list.length === 1){ shareOrDownload(list[0].blob, list[0].fname, title); return; }
+  closeModal();
+  let files = [];
+  try{
+    files = list.map(it=> new File([it.blob], it.fname, {type: it.blob.type || 'application/octet-stream'}));
+  }catch(e){ files = []; }
+  const downloadAll = ()=>{
+    list.forEach((it,i)=> setTimeout(()=>download(it.blob, it.fname), i*300));
+    toast('已开始下载 ' + list.length + ' 个文件');
+  };
+  if(files.length && navigator.canShare && navigator.share && navigator.canShare({files})){
+    navigator.share({files, title: title}).then(()=>{
+      toast('已分享 ' + files.length + ' 个文件');
+    }).catch(err=>{
+      if(err && err.name === 'AbortError'){ toast('已取消导出'); return; }
+      downloadAll();
+    });
+    return;
+  }
+  downloadAll();
+}
 function shareSingleTable(tableId){
   const t = db.tables.find(x=>x.id===tableId); if(!t) return;
   closeFieldMenu();
+  const sheets = shareSheetsOf(tableId);
+  const multi = sheets.length > 1;
+  const bn = esc(bookNameOf(t) || t.name);
+  const hint = multi
+    ? '本表含 <b>'+sheets.length+' 个工作表</b>（'+sheets.map(s=>esc(s.name)).join(' / ')+'），导出会<b>全部包含</b>。'
+    : '选择导出格式，可下载或通过微信分享';
   const html = '<div class="modal small">'+
-    '<div class="modal-head"><h2>分享「'+esc(t.name)+'」</h2><button type="button" class="icon-btn" onclick="closeModal()">'+svg('i-x')+'</button></div>'+
+    '<div class="modal-head"><h2>分享「'+bn+'」</h2><button type="button" class="icon-btn" onclick="closeModal()">'+svg('i-x')+'</button></div>'+
     '<div class="modal-body" style="padding:16px">'+
-      '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">选择导出格式，可下载或通过微信分享</div>'+
+      '<div style="font-size:12px;color:var(--muted);margin-bottom:12px">'+hint+'</div>'+
       '<div style="display:flex;flex-direction:column;gap:10px">'+
-        '<button class="btn primary" onclick="doShareFmt(\''+tableId+'\',\'json\')">导出 JSON 格式</button>'+
-        '<button class="btn primary" onclick="doShareFmt(\''+tableId+'\',\'csv\')">导出 CSV 格式（Excel可打开）</button>'+
-        '<button class="btn primary" onclick="doShareFmt(\''+tableId+'\',\'pdf\')">导出 PDF 格式（文字版）</button>'+
+        '<button class="btn primary" onclick="doShareFmt(\''+tableId+'\',\'json\')">导出 JSON 格式'+(multi?'（全部工作表）':'')+'</button>'+
+        '<button class="btn primary" onclick="doShareFmt(\''+tableId+'\',\'csv\')">导出 CSV 格式（Excel可打开）'+(multi?'（每个工作表一个文件）':'')+'</button>'+
+        '<button class="btn primary" onclick="doShareFmt(\''+tableId+'\',\'pdf\')">导出 PDF 格式（文字版）'+(multi?'（每个工作表一个文件）':'')+'</button>'+
       '</div></div></div>';
   openModal(html);
 }
@@ -3344,24 +3391,49 @@ function buildRasterPdfBytes(pages, pw, ph){
 }
 function doShareFmt(tableId, fmt){
   const t = db.tables.find(x=>x.id===tableId); if(!t) return;
+  const sheets = shareSheetsOf(tableId);          // 工作簿里的**全部**工作表
+  const multi = sheets.length > 1;
+  const base = shareBookName(t);
+  const nameOf = s => multi ? (base + '-' + safeFileBase(s.name)) : base;
+
   if(fmt==='csv'){
-    // Reuse the same csvCell() as the in-app export so escaping, bool 是/否 and
-    // array joining are consistent (header included).
-    const header = ['编号', ...t.fields.map(f=>csvCell(f.name))].join(',');
-    const lines = t.rows.map(r => [r.no!=null?r.no:'', ...t.fields.map(f=>csvCell(r.values[f.id], f))].join(','));
-    const csv = '\ufeff' + [header, ...lines].join('\r\n');
-    shareOrDownload(new Blob([csv], {type:'text/csv;charset=utf-8'}), t.name+'.csv', t.name);
-  } else if(fmt==='json'){
-    // 同样带上关联分组（否则对方导入后"关联记录"是空的）
+    // 和站内「导出 CSV」用同一个 csvCell()：转义、是/否、数组合并都一致
+    const items = sheets.map(s=>{
+      const header = ['编号', ...s.fields.map(f=>csvCell(f.name))].join(',');
+      const lines = s.rows.map(r => [r.no!=null?r.no:'', ...s.fields.map(f=>csvCell(r.values[f.id], f))].join(','));
+      const csv = '\ufeff' + [header, ...lines].join('\r\n');
+      return { blob: new Blob([csv], {type:'text/csv;charset=utf-8'}), fname: nameOf(s)+'.csv' };
+    });
+    shareMany(items, base);
+    return;
+  }
+
+  if(fmt==='json'){
+    if(multi){
+      // 多工作表：走**备份格式**（tables[] + bookNames），对方导入后仍然是一本多工作表 ✓
+      // 单表格式 {name,fields,rows} 只能装一张，导进来会变成互不相干的独立表 ✗
+      const payload = Object.assign({ v:1 }, exportPayloadByTables(sheets));
+      shareOrDownload(new Blob([JSON.stringify(payload, null, 2)], {type:'application/json;charset=utf-8'}), base+'.json', base);
+      return;
+    }
+    // 单工作表：保持原来的单表格式（老版本也能导入）
     const p0 = tableExportPayload(t);
     const data = { name: t.name, fields: t.fields, rows: t.rows, view: t.view||{}, xgroups: p0.xgroups };
-    shareOrDownload(new Blob([JSON.stringify(data, null, 2)], {type:'application/json;charset=utf-8'}), t.name+'.json', t.name);
-  } else if(fmt==='pdf'){
+    shareOrDownload(new Blob([JSON.stringify(data, null, 2)], {type:'application/json;charset=utf-8'}), base+'.json', base);
+    return;
+  }
+
+  if(fmt==='pdf'){
     // 生成真正的 PDF 文件（canvas 绘制，与表格版式一致），可直接下载/分享到微信
-    genTablePdfBlob(t, 'landscape').then(blob0=>{
-      if(!blob0){ toast('生成 PDF 失败'); return; }
-      shareOrDownload(blob0, t.name+'.pdf', t.name);
-    }).catch(()=>{ toast('生成 PDF 失败'); });
+    Promise.all(sheets.map(s=>genTablePdfBlob(s, 'landscape').catch(()=>null)))
+      .then(blobs=>{
+        const items = [];
+        blobs.forEach((b, i)=>{ if(b) items.push({ blob:b, fname: nameOf(sheets[i])+'.pdf' }); });
+        if(!items.length){ toast('生成 PDF 失败'); return; }
+        if(items.length < sheets.length) toast('有 ' + (sheets.length - items.length) + ' 个工作表生成失败');
+        shareMany(items, base);
+      })
+      .catch(()=>{ toast('生成 PDF 失败'); });
     return;
   }
 }
@@ -5479,7 +5551,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-21.5</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-23.1</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
