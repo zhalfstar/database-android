@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-23.7</title>
+<title>轻量数据库 · v2026-10-23.8</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -983,7 +983,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-23.7">v2026-10-23.7</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-23.8">v2026-10-23.8</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -5575,7 +5575,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-23.7</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-23.8</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -6502,6 +6502,34 @@ function addLinkFromGroup(tableId, fieldId, gid, ev){
    "导入后要关联新成员，不知道怎么操作"）。
    锚点必须选**本表里属于这一组的行** —— 同表行靠 links 认，跨表行靠 xgroups.rows 认；
    进关联模式后 `finishLinkMode` 会沿用这个锚点已有的组，不会另起一组 ✓ */
+/* 这一行"属于哪个跨表组"—— 先看 links，再看 xgroups 成员名单。
+   ⚠️ 老数据（v2026-10-23.5 之前关联出来的）本表的行**只有 xgroups 成员、没有 links**，
+   只查 links 会得到 null → 于是又 uid() 新建一个组（真机 2026-10-23：
+   "点增加关联，新加成员和选中成员组成一个新组，只有这两个人"）✗ */
+function xgroupGidOfRow(tableId, rowId){
+  const t = db.tables.find(x=>x.id===tableId);
+  const r = t && t.rows.find(x=>x.id===rowId);
+  if(r && r.links){
+    const k = Object.keys(r.links).find(fid=>r.links[fid]);
+    if(k) return r.links[k];
+  }
+  const g = (db.xgroups||[]).find(x=>(x.rows||[]).some(mm=>mm.t===tableId && mm.r===rowId));
+  return g ? g.id : null;
+}
+/* 把这一组里"本表的成员行"补上 links（老数据自愈）：不补的话本表这一侧永远没有组别号 ✗ */
+function healXGroupLinks(tableId, gid){
+  const t = db.tables.find(x=>x.id===tableId); if(!t) return;
+  const g = (db.xgroups||[]).find(x=>x.id===gid); if(!g) return;
+  const fid = t.fields.some(f=>f.id===g.fieldId) ? g.fieldId : (t.fields[0] && t.fields[0].id);
+  if(!fid) return;
+  (g.rows||[]).forEach(mm=>{
+    if(mm.t !== tableId) return;
+    const r = t.rows.find(x=>x.id===mm.r); if(!r) return;
+    if(!r.links) r.links = {};
+    const has = Object.keys(r.links).some(k=>r.links[k]===gid);
+    if(!has) r.links[fid] = gid;
+  });
+}
 function addLinkFromXGroup(tableId, xgId, ev){
   if(ev){ ev.stopPropagation(); ev.preventDefault(); }
   const g = (db.xgroups||[]).find(x=>x.id===xgId); if(!g) return;
@@ -6510,6 +6538,7 @@ function addLinkFromXGroup(tableId, xgId, ev){
   const anchor = mem ? t.rows.find(r=>r.id===mem.r) : null;
   closeGroupPanel();
   if(!anchor){ toast('请先长按这条记录 →「关联到其他记录」来加成员'); return; }
+  healXGroupLinks(tableId, g.id);        // 老数据：先把本表成员行的 links 补上 ✓
   const fid = t.fields.some(f=>f.id===g.fieldId) ? g.fieldId : autoLinkField(t, anchor);
   if(!fid){ toast('这张表没有可用字段'); return; }
   startLinkPick(tableId, anchor.id, fid);
@@ -7082,11 +7111,11 @@ function finishLinkMode(){
     let gid = null;
     const anchorRow = t.rows.find(x=>x.id===m.anchorId);
     if(anchorRow && anchorRow.links) gid = anchorRow.links[m.fieldId] || anchorRow.links.__any__ || null;
+    if(!gid && anchorRow) gid = xgroupGidOfRow(m.tableId, anchorRow.id);   // 老数据靠成员身份认组
     if(!gid){
       for(const p of m.picked){
         if(typeof p!=='string') continue;
-        const rr = t.rows.find(x=>x.id===p);
-        const g0 = rr && rr.links && (rr.links[m.fieldId] || rr.links.__any__);
+        const g0 = xgroupGidOfRow(m.tableId, p);
         if(g0){ gid = g0; break; }
       }
     }
@@ -7119,6 +7148,8 @@ function finishLinkMode(){
     if(r && r.links){ gid = r.links[m.fieldId] || r.links.__any__ || null; }
     if(gid) break;
   }
+  // 老数据：本表行只有 xgroups 成员身份、没有 links → 按成员身份认组，别再新建 ✗
+  if(!gid){ for(const rid of m.picked){ const g0 = xgroupGidOfRow(m.tableId, rid); if(g0){ gid = g0; break; } } }
   if(!gid) gid = uid();
   let n = 0;
   for(const rid of m.picked){
