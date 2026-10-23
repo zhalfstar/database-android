@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-23.2</title>
+<title>轻量数据库 · v2026-10-23.3</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -982,7 +982,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-23.2">v2026-10-23.2</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-23.3">v2026-10-23.3</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -5561,7 +5561,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-23.2</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-23.3</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -10153,36 +10153,61 @@ function togglePropsMenu(btn){
   closeFieldMenu();
   const row = row0;
   const reqInput = row.querySelector('.f-required');
-  const reqVal = reqInput && reqInput.value === '1';
   const hidInput = row.querySelector('.f-hidden');
-  const hidVal = hidInput && hidInput.value === '1';
   const multiInput = row.querySelector('.f-multi');
-  const multiVal = multiInput ? multiInput.value !== '0' : true;
   const typePick = row.querySelector('.type-pick');
-  const isSelect = typePick && typePick.dataset.t === 'select';
-  const isMoney = typePick && typePick.dataset.t === 'money';
+  const curSymInput = row.querySelector('.f-cur-sym');
+  const curDecInput = row.querySelector('.f-cur-dec');
+  const curNegInput = row.querySelector('.f-cur-neg');
+  const uniqInput = row.querySelector('.f-unique');
+  const dnInput = row.querySelector('.f-defnow');
+
+  /* ⭐ 显示值一律**以 db 里的字段为准**，DOM 隐藏域只当兜底 ✗
+     为什么：隐藏域是"渲染产物"，只要它没和 db 同步（导入、行被重建、旧版遗留…），
+     菜单里就会显示成"没勾选 / 没选中"，而实际录入仍然按真属性走 —— 用户看到的就是
+     「设置丢了，但输入时又生效」（真机 2026-10-23：货币符号、小数位不显示勾选）✗
+     新建表时字段还没进 db（_tf 为空），此时才回落到 DOM。 */
+  const _grid = document.getElementById('grid');
+  // 优先用「管理数据表」弹窗正在编辑的那张表（editTableId），其次才是表格页当前表
+  const _tid = (editTableId || ((_grid && _grid.dataset) ? _grid.dataset.tableId : '')) || '';
+  const _tf = (function(){
+    const t = db.tables.find(x=>x.id === _tid);
+    if(!t) return null;
+    return t.fields.find(x=>x.id === (row0.dataset.fid || '')) || null;
+  })();
+  const pick = (dbVal, domVal) => (_tf && dbVal !== undefined && dbVal !== null) ? dbVal : domVal;
+
+  const reqVal = !!pick(_tf ? _tf.required : undefined, !!(reqInput && reqInput.value === '1'));
+  const hidVal = !!pick(_tf ? _tf.hidden : undefined, !!(hidInput && hidInput.value === '1'));
+  const multiVal = (_tf ? _tf.multi !== false : (multiInput ? multiInput.value !== '0' : true));
+  const uniqVal = !!pick(_tf ? _tf.unique : undefined, !!(uniqInput && uniqInput.value === '1'));
+  const dnVal = !!pick(_tf ? _tf.defNow : undefined, !!(dnInput && dnInput.value === '1'));
+
+  const _ftype = _tf ? _tf.type : (typePick && typePick.dataset.t);
+  const isSelect = _ftype === 'select';
+  const isMoney = _ftype === 'money';
+  const isFormula = _ftype === 'formula';
+  const isTimeType = ['date','time','datetime','book'].includes(_ftype);
+
+  // ⚠️ 全角「￥」(U+FFE5) 和半角「¥」(U+00A5) 要视为同一个符号 ✗
+  //    否则下拉里匹配不上 → 显示成「无符号」，而录入时按 f.curSym 又照常显示 ￥（真机 2026-10-23）
+  const normSym = v => (v === '￥' ? '¥' : v);
+  const curSymVal = normSym(_tf ? String(_tf.curSym || '') : (curSymInput ? curSymInput.value : ''));
+  const curDecVal = _tf ? (_tf.curDec === undefined || _tf.curDec === null ? '' : String(_tf.curDec)) : (curDecInput ? curDecInput.value : '');
+  const curNegVal = _tf ? String(_tf.curNeg || '') : (curNegInput ? curNegInput.value : '');
+
   let multiRow = '';
   if(isSelect){
     multiRow = `<div class="fm-row fm-chk"><span>允许多选</span><input type="checkbox" id="menu-multi"${multiVal?' checked':''}></div>`;
   }
-  const curSymInput = row.querySelector('.f-cur-sym');
-  const curDecInput = row.querySelector('.f-cur-dec');
-  const curNegInput = row.querySelector('.f-cur-neg');
   let moneyRow = '';
   if(isMoney){
     moneyRow = `<div class="fm-sec">货币格式</div>
-      <div class="fm-row"><span>符号</span><select id="menu-cur-sym" class="fm-sel"><option value="¥"${curSymInput&&curSymInput.value==='¥'?' selected':''}>¥ 人民币</option><option value="$"${curSymInput&&curSymInput.value==='$'?' selected':''}>$ 美元</option><option value="€"${curSymInput&&curSymInput.value==='€'?' selected':''}>€ 欧元</option><option value="£"${curSymInput&&curSymInput.value==='£'?' selected':''}>£ 英镑</option><option value=""${!curSymInput||curSymInput.value===''?' selected':''}>无符号</option></select></div>
-      <div class="fm-row"><span>小数位</span><select id="menu-cur-dec" class="fm-sel">${[0,1,2,3,4].map(d=>`<option value="${d}"${curDecInput&&Number(curDecInput.value)===d?' selected':''}>${d} 位</option>`).join('')}</select></div>
-      <div class="fm-row"><span>负数格式</span><select id="menu-cur-neg" class="fm-sel"><option value="minus"${!curNegInput||curNegInput.value==='minus'?' selected':''}>-1,234.56</option><option value="red"${curNegInput&&curNegInput.value==='red'?' selected':''}>红色 -1,234.56</option><option value="paren"${curNegInput&&curNegInput.value==='paren'?' selected':''}>(1,234.56)</option></select></div>
+      <div class="fm-row"><span>符号</span><select id="menu-cur-sym" class="fm-sel"><option value="¥"${curSymVal==='¥'?' selected':''}>¥ 人民币</option><option value="$"${curSymVal==='$'?' selected':''}>$ 美元</option><option value="€"${curSymVal==='€'?' selected':''}>€ 欧元</option><option value="£"${curSymVal==='£'?' selected':''}>£ 英镑</option><option value=""${curSymVal===''?' selected':''}>无符号</option></select></div>
+      <div class="fm-row"><span>小数位</span><select id="menu-cur-dec" class="fm-sel">${[0,1,2,3,4].map(d=>`<option value="${d}"${(curDecVal!=='' ? Number(curDecVal)===d : d===2)?' selected':''}>${d} 位</option>`).join('')}</select></div>
+      <div class="fm-row"><span>负数格式</span><select id="menu-cur-neg" class="fm-sel"><option value="minus"${(curNegVal===''||curNegVal==='minus')?' selected':''}>-1,234.56</option><option value="red"${curNegVal==='red'?' selected':''}>红色 -1,234.56</option><option value="paren"${curNegVal==='paren'?' selected':''}>(1,234.56)</option></select></div>
       <div class="fm-cur-hint" id="menu-cur-hint"></div>`;
   }
-  const uniqInput = row.querySelector('.f-unique');
-  const uniqVal = uniqInput && uniqInput.value === '1';
-  // 日期/时间类字段：可设「默认当前时间」（新建记录时自动预填录入时刻）
-  const isFormula = typePick && typePick.dataset.t === 'formula';
-  const isTimeType = typePick && ['date','time','datetime','book'].includes(typePick.dataset.t);
-  const dnInput = row.querySelector('.f-defnow');
-  const dnVal = dnInput && dnInput.value === '1';
   const defNowRow = isTimeType ? `<div class="fm-row fm-chk"><span>默认当前时间</span><input type="checkbox" id="menu-defnow"${dnVal?' checked':''}></div>` : '';
   const fxRow = isFormula ? `<div class="fm-row"><button type="button" class="btn sm" id="menu-fx-edit" style="width:100%">✎ 编辑公式</button></div>` : '';
   const menu = document.createElement('div');
