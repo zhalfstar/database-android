@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-23.8</title>
+<title>轻量数据库 · v2026-10-23.9</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -983,7 +983,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-23.8">v2026-10-23.8</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-23.9">v2026-10-23.9</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -5575,7 +5575,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-23.8</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-23.9</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -6022,9 +6022,14 @@ function cellInnerHTML(t, r, f, ctx){
   const firstFid = t.fields.length ? t.fields[0].id : '';
   const gid = r.links && (r.links[f.id] || (f.id===firstFid && r.links.__any__));
   const gnum = gid && gnums[gid] ? gnums[gid] : '';
-  const xgb = (db.xgroups||[]).map((g,i)=>({g,i})).filter(o=>o.g.rows.some(m=>m.t===t.id && m.r===r.id));
-  const xbadge = xgb.map(o=>`<span class="g-num xg" title="跨表关联组（点击查看成员及来源）" onclick="showXGroup('${t.id}','${o.g.id}',event)">X${o.i+1}</span>`).join('');
-  return `${ctx.rowRes||''}${displayVal(r,f)}${gnum?`<span class="g-num" title="查看关联组成员" onclick="showGroupMembers('${t.id}','${f.id}','${gid}',event)">${gnum}</span>`:''}${xMountIds.has(f.id)?xbadge:''}`;
+  // 这一行还在哪些跨表组里（去掉和上面同一个组的，避免同一个组画两个角标「1,X1」）
+  const xgIds = (db.xgroups||[]).map(g=>g.id).filter(gid2=>
+    gid2 !== gid && (db.xgroups||[]).some(g=>g.id===gid2 && (g.rows||[]).some(m=>m.t===t.id && m.r===r.id)));
+  // 跨表那侧（本表行没有 links）用**同一个数字**，只是样式不同 + 提示"跨表"
+  const xbadge = (!gnum && xgIds.length && xMountIds.has(f.id))
+    ? `<span class="g-num xg" title="跨表关联组（点击查看成员及来源）" onclick="showXGroup('${t.id}','${xgIds[0]}',event)">${gnums[xgIds[0]] || '?'}</span>`
+    : '';
+  return `${ctx.rowRes||''}${displayVal(r,f)}${gnum?`<span class="g-num" title="查看关联组成员" onclick="showGroupMembers('${t.id}','${f.id}','${gid}',event)">${gnum}</span>`:''}${xbadge}`;
 }
 /* ===== 单元格就地编辑（**只在电脑版**；手机/平板完全不走这里）=====
    交互：双击某个单元格 → 变成输入框 → 回车/点别处提交，Esc 取消，Tab 提交并跳到右边一格。
@@ -6392,18 +6397,26 @@ function bindThTap(grid){
   });
 }
 let linkMode = null;
-function groupNumbers(t){
+/* 组别号：**全库一套编号** ✗ —— 以前 `groupNumbers(t)` 是"按这张表的行顺序"编号，
+   跨表那侧又用 `db.xgroups` 的数组下标（还带个 X 前缀），两套号根本对不上：
+   同一个组在客户表叫「组1」、在订单表叫「X1」，用户看到的就是"新成员组别号不一样"（真机 2026-10-23）✗
+   现在统一：先按表顺序+行顺序给所有"行上挂着的组"编号，再给只在 xgroups 里的组补号 ✓ */
+function groupNoMap(){
   const m = {};
   let n = 0;
-  (t.rows||[]).forEach(r=>{
-    if(!r || !r.links) return;
-    Object.keys(r.links).forEach(fid=>{
-      const gid = r.links[fid];
-      if(gid && !(gid in m)) m[gid] = ++n;
+  (db.tables||[]).forEach(t=>{
+    (t.rows||[]).forEach(r=>{
+      if(!r || !r.links) return;
+      Object.keys(r.links).forEach(fid=>{
+        const gid = r.links[fid];
+        if(gid && !(gid in m)) m[gid] = ++n;
+      });
     });
   });
+  (db.xgroups||[]).forEach(g=>{ if(g && g.id && !(g.id in m)) m[g.id] = ++n; });
   return m;
 }
+function groupNumbers(t){ return groupNoMap(); }
 function collectGroupRows(tableId, fieldId, gid, xg, anchorT){
   const localT = anchorT || (tableId ? db.tables.find(x=>x.id===tableId) : null);
   const seen = new Set(); const rows = [];
@@ -7030,11 +7043,8 @@ function toggleXLink(xtId, xrId, ev){
   updateLinkCount();
   renderLinkResults();
 }
-function xGroupNumbers(){
-  const m = {};
-  (db.xgroups||[]).forEach((g,i)=>{ m[g.id] = i+1; });
-  return m;
-}
+// 跨表组也用**同一套**组别号（以前是 xgroups 的数组下标，和本表的「组N」对不上）
+function xGroupNumbers(){ return groupNoMap(); }
 function xFieldName(g){
   for(const t of db.tables){ const f = t.fields.find(x=>x.id===g.fieldId); if(f) return f.name; }
   return '';
