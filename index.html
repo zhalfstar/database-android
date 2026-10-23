@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-23.10</title>
+<title>轻量数据库 · v2026-10-24.1</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -983,7 +983,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-23.10">v2026-10-23.10</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-24.1">v2026-10-24.1</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -1478,6 +1478,17 @@ function normalizeDb(d){
   d.bookNames = {};
   Object.keys(bn).forEach(k=>{ const v = bn[k]; if(typeof v === 'string' && v.trim()) d.bookNames[String(k)] = v.trim(); });
   d.xgroups = Array.isArray(d.xgroups) ? d.xgroups.filter(g=>g && Array.isArray(g.rows)).map(g=>({ id:String(g.id||uid()), fieldId:String(g.fieldId||''), rows:g.rows.map(m=>({ t:String(m.t||''), r:String(m.r||'') })).filter(m=>m.t && m.r) })) : [];
+  /* 组别号的**持久化编号表** { 组id: 号 } —— 必须保留 ✗
+     以前组号是"每次渲染按当前数据重新排出来的序号"，只要某个组补上了行标记（加成员时会补），
+     它就会从"补号区"跳到"行顺序区"，把别的组挤得往后挪一位
+     → 用户看到「新增成员后，原来那组的号变成新的号」（真机 2026-10-24）✗
+     现在号一旦分配就写进这里，永不变。 */
+  const gn = (d.gno && typeof d.gno === 'object') ? d.gno : {};
+  d.gno = {};
+  Object.keys(gn).forEach(k=>{
+    const v = gn[k];
+    if(Number.isFinite(v) && v > 0) d.gno[String(k)] = Math.floor(v);
+  });
   return d;
 }
 let db = load();
@@ -5575,7 +5586,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-23.10</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-24.1</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -6402,19 +6413,48 @@ let linkMode = null;
    同一个组在客户表叫「组1」、在订单表叫「X1」，用户看到的就是"新成员组别号不一样"（真机 2026-10-23）✗
    现在统一：先按表顺序+行顺序给所有"行上挂着的组"编号，再给只在 xgroups 里的组补号 ✓ */
 function groupNoMap(){
-  const m = {};
-  let n = 0;
+  /* ⚠️ 组别号必须是**组的固定编号**，不能"按当前数据临时排序"✗
+     临时排序的问题：某个组一旦补上"行标记"（加成员时会补），它就从"补号区"跳到"行顺序区"，
+     把其它组挤得挪位 → 用户看到「加成员后原来那组的号变了」（真机 2026-10-24）✗
+     现在：号记在 `db.gno` 里，一旦分配就永不变；只有解散组时才删（见 forgetGroupNo）✓ */
+  const store = (db.gno && typeof db.gno === 'object') ? db.gno : (db.gno = {});
+  const ids = [];
+  const push = id => { const k = String(id || ''); if(k && ids.indexOf(k) < 0) ids.push(k); };
   (db.tables||[]).forEach(t=>{
     (t.rows||[]).forEach(r=>{
       if(!r || !r.links) return;
-      Object.keys(r.links).forEach(fid=>{
-        const gid = r.links[fid];
-        if(gid && !(gid in m)) m[gid] = ++n;
-      });
+      Object.keys(r.links).forEach(fid=>push(r.links[fid]));
     });
   });
-  (db.xgroups||[]).forEach(g=>{ if(g && g.id && !(g.id in m)) m[g.id] = ++n; });
+  (db.xgroups||[]).forEach(g=>push(g && g.id));
+  const used = new Set();
+  Object.keys(store).forEach(k=>{
+    if(ids.indexOf(k) >= 0 && Number.isFinite(store[k]) && store[k] > 0) used.add(store[k]);
+  });
+  let max = 0; used.forEach(n=>{ if(n > max) max = n; });
+  ids.forEach(id=>{
+    if(Number.isFinite(store[id]) && store[id] > 0) return;
+    let n = max + 1;
+    while(used.has(n)) n++;
+    store[id] = n; used.add(n); max = n;
+  });
+  const m = {};
+  ids.forEach(id=>{ m[id] = store[id]; });
   return m;
+}
+/* 组没了就释放它的号（只由"解散组 / 取消关联"这类明确操作调用，
+   不要在 groupNoMap 里自动清理 —— 组在操作中间态短暂消失时会把号弄丢） */
+function forgetGroupNo(gid){
+  if(!gid) return;
+  if(db.gno && typeof db.gno === 'object') delete db.gno[String(gid)];
+}
+/* 解散之后调用：确认这个组真的没人引用了，才释放它的号（还有人在用就不动） */
+function releaseGroupNoIfGone(gid){
+  if(!gid) return;
+  const still = (db.xgroups||[]).some(g=>String(g.id) === String(gid))
+    || (db.tables||[]).some(t=>(t.rows||[]).some(r=>r && r.links &&
+         Object.keys(r.links).some(k=>String(r.links[k]) === String(gid))));
+  if(!still) forgetGroupNo(gid);
 }
 function groupNumbers(t){ return groupNoMap(); }
 function collectGroupRows(tableId, fieldId, gid, xg, anchorT){
@@ -6566,6 +6606,7 @@ function dissolveGroup(tableId, fieldId, gid, ev){
       if(!Object.keys(x.links).length) x.links = {};
     }
   });
+  releaseGroupNoIfGone(gid);
   closeGroupPanel();
   save(); renderTable(t);
   toast('该组已解散');
@@ -7072,6 +7113,12 @@ function unlinkXMember(gid, xt, xr, ev){
 function dissolveXGroup(gid, ev){
   if(ev){ ev.stopPropagation(); ev.preventDefault(); }
   db.xgroups = (db.xgroups||[]).filter(x=>x.id!==gid);
+  // 组没了，把它的号也释放掉（否则号只增不减，越用越大）
+  (db.tables||[]).forEach(t=>(t.rows||[]).forEach(r=>{
+    if(!r || !r.links) return;
+    Object.keys(r.links).forEach(k=>{ if(String(r.links[k]) === String(gid)) delete r.links[k]; });
+  }));
+  releaseGroupNoIfGone(gid);
   closeGroupPanel();
   save(); render();
   toast('该跨表组已解散');
@@ -10897,7 +10944,16 @@ function exportPayloadByTables(list){
   const bookIds = new Set(list.map(t=>t.bookId).filter(Boolean));
   const bookNames = {};
   Object.keys(db.bookNames||{}).forEach(k=>{ if(bookIds.has(k)) bookNames[k] = db.bookNames[k]; });
-  return { tables: list, folders: (db.folders||[]).filter(f=>folderIds.has(f.id)), xgroups, bookNames };
+  // 组别号也要带走，否则对方导入后按自己的顺序重新编号，号就变了
+  const gno = {};
+  const gidSet = new Set();
+  xgroups.forEach(g=>gidSet.add(String(g.id)));
+  list.forEach(t=>(t.rows||[]).forEach(r=>{
+    if(!r || !r.links) return;
+    Object.keys(r.links).forEach(fid=>{ const gid = r.links[fid]; if(gid) gidSet.add(String(gid)); });
+  }));
+  Object.keys(db.gno||{}).forEach(k=>{ if(gidSet.has(String(k))) gno[k] = db.gno[k]; });
+  return { tables: list, folders: (db.folders||[]).filter(f=>folderIds.has(f.id)), xgroups, bookNames, gno };
 }
 /* ===== 按"一批表"直接导出（文件夹 / 多选 共用） =====
    多工作表的工作簿要把**所有工作表**一起带上，否则又变成"只导出第一张"✗ */
@@ -11260,6 +11316,20 @@ function doImportSelected(){
     db.xgroups.push({ id: nid, fieldId: String(g.fieldId||''), rows: members });
     xgAdded++;
   });
+  /* 组别号：文件里带了就沿用（对方看到的是「组1」，这边导入后还是「组1」），
+     没带（老文件）就留空，由 groupNoMap 按顺序补号 */
+  const srcGno = (importAll && importAll.gno && typeof importAll.gno === 'object') ? importAll.gno : null;
+  if(srcGno){
+    db.gno = db.gno || {};
+    Object.keys(srcGno).forEach(k=>{
+      const v = srcGno[k];
+      if(!Number.isFinite(v) || v <= 0) return;
+      const ng = newGid(String(k));
+      // 号已被别的组占用 → 让 groupNoMap 重新分配，避免两个组显示同一个号
+      const taken = Object.keys(db.gno).some(x=>db.gno[x] === Math.floor(v));
+      if(!taken) db.gno[ng] = Math.floor(v);
+    });
+  }
   db.tables.forEach((t,i)=>{ t.order = i; });
   ui.tableQuery = {};
   save(); render();
