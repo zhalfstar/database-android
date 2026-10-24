@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-24.3</title>
+<title>轻量数据库 · v2026-10-24.4</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -983,7 +983,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-24.3">v2026-10-24.3</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-24.4">v2026-10-24.4</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -5586,7 +5586,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-24.3</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-24.4</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -6554,6 +6554,18 @@ function showGroupMembers(tableId, fieldId, gid, ev){
   const xg = (db.xgroups||[]).find(g=>String(g.id) === String(gid)) || null;
   renderGroupPanel(tableId, fieldId, gid, xg, ev, true);
 }
+/* 组里增删成员之后统一走这里 ✗ 以前直接调 render()（整页重绘）→ 表格滚动位置归零，
+   用户点组号删完一个人，回来发现表格跑回顶部了（真机 2026-10-24："完成时也是会跳到其他地方"）。
+   现在：只重绘**当前这张表**（保留滚动位置），再定位到本表里还属于这一组的某条记录 */
+function refreshAfterGroupEdit(gid, preferTid){
+  const gridEl = document.getElementById('grid');
+  const tid = preferTid || (gridEl && gridEl.dataset ? gridEl.dataset.tableId : '');
+  const t = db.tables.find(x=>x.id===tid);
+  if(t) renderTable(t); else render();
+  if(!t || !gid) return;
+  const row = (t.rows||[]).find(r=>r && r.links && Object.keys(r.links).some(k=>String(r.links[k]) === String(gid)));
+  if(row) setTimeout(()=>{ try{ focusRow(t.id, row.id); }catch(e){} }, 60);
+}
 /* 把某条记录滚到可视区中间并闪一下（编辑保存后用，让用户看到"就是这条"） */
 function focusRow(tid, rid){
   const tr = document.querySelector('#grid tbody tr[data-rid="'+rid+'"]');
@@ -6687,7 +6699,8 @@ function unlinkMemberFromGroup(tableId, rowId, fieldId, gid, ev){
     });
   }
   closeGroupPanel();
-  save(); renderTable(t);
+  save();
+  refreshAfterGroupEdit(gid, tableId);       // 保留滚动位置，定位到本表剩下的成员
   toast('已取消该成员的关联');
 }
 function autoLinkField(t, r){
@@ -7173,8 +7186,10 @@ function unlinkXMember(gid, xt, xr, ev){
     if(!Object.keys(xrow.links).length) xrow.links = {};
   }
   if(g.rows.length <= 1) db.xgroups = db.xgroups.filter(x=>x.id!==gid);
+  const _keepTid = (document.getElementById('grid')||{}).dataset ? document.getElementById('grid').dataset.tableId : '';
   closeGroupPanel();
-  save(); render();
+  save();
+  refreshAfterGroupEdit(gid, _keepTid);
   toast('已取消该成员的跨表关联');
 }
 function dissolveXGroup(gid, ev){
@@ -7186,8 +7201,10 @@ function dissolveXGroup(gid, ev){
     Object.keys(r.links).forEach(k=>{ if(String(r.links[k]) === String(gid)) delete r.links[k]; });
   }));
   releaseGroupNoIfGone(gid);
+  const _keepTid2 = (document.getElementById('grid')||{}).dataset ? document.getElementById('grid').dataset.tableId : '';
   closeGroupPanel();
-  save(); render();
+  save();
+  refreshAfterGroupEdit('', _keepTid2);      // 组已没了，只保证"别跳位置"
   toast('该跨表组已解散');
 }
 function cycleLinkField(){
