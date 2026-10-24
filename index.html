@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-24.1</title>
+<title>轻量数据库 · v2026-10-24.2</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -983,7 +983,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-24.1">v2026-10-24.1</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-24.2">v2026-10-24.2</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -5586,7 +5586,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-24.1</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-24.2</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -6464,11 +6464,35 @@ function collectGroupRows(tableId, fieldId, gid, xg, anchorT){
     const xt = db.tables.find(x=>x.id===tid); if(!xt) return;
     const xr = xt.rows.find(x=>x.id===rid); if(!xr) return;
     const k = tid+'|'+rid; if(seen.has(k)) return; seen.add(k);
-    const nm = xt.fields[0] ? String(rawVal(xr,xt.fields[0])||'').trim() : '';
+    /* 成员名：优先第一列，第一列是空（比如它就是个"关联组"空字段）就往后找第一个有内容的，
+       否则面板里只剩「【订单】#2」，用户认不出是谁（真机 2026-10-24） */
+    const nm = (function(){
+      const cut = v => { v = String(v||'').trim(); return v.length > 24 ? v.slice(0,24)+'…' : v; };
+      const f0 = xt.fields[0];
+      const v0 = f0 ? cut(rawVal(xr, f0)) : '';
+      if(v0) return v0;
+      for(const fx of xt.fields){
+        if(fx.type==='formula' || fx.type==='money' || fx.type==='number' || fx.type==='bool') continue;
+        const v = cut(rawVal(xr, fx));
+        if(v) return v;
+      }
+      return '';
+    })();
     rows.push({t:tid, r:rid, no:xr.no, nm, x: tid!==tableId});
   };
-  if(gid && localT){
-    localT.rows.forEach(x=>{ if(x.links && (x.links[fieldId]===gid || (x.links[fieldId]==null && x.links.__any__===gid))) push(localT.id, x.id); });
+  /* ⚠️ 成员要**扫全库**，不能只看当前这张表 ✗
+     真机 2026-10-24：张三（客户）— 李四（订单）跨表关联，再从李四关联同表的王五。
+     王五只在「订单表」的行上有组标记，客户表的张三点组别号时只看本表 → 看不到王五 ✗
+     所以：任何一张表里"有 links 指向这个组"的行，都算这一组的成员。
+     （字段可能不同表不同名，所以按"links 的值"判断，不按 fieldId） */
+  if(gid){
+    (db.tables||[]).forEach(xt0=>{
+      (xt0.rows||[]).forEach(x=>{
+        if(!x.links) return;
+        const hit = Object.keys(x.links).some(k=>String(x.links[k]) === String(gid));
+        if(hit) push(xt0.id, x.id);
+      });
+    });
   }
   if(xg && xg.rows){ xg.rows.forEach(m=>push(m.t, m.r)); }
   return rows;
@@ -6479,8 +6503,9 @@ function renderGroupPanel(tableId, fieldId, gid, xg, ev, localTitle, anchorT){
   closeGroupPanel();
   const rows = collectGroupRows(tableId, fieldId, gid, xg, anchorT);
   const f = t.fields.find(x=>x.id===fieldId) || t.fields[0];
+  // 同一个组不管从哪张表点进来，标题都要一致（是跨表组就写「跨表组N」）
   const title = localTitle
-    ? `组${groupNumbers(t)[gid]||'?'} · 按「${esc(f?f.name:'')}」关联（${rows.length} 条）`
+    ? `${xg ? '跨表组' : '组'}${groupNumbers(t)[gid]||'?'} · 按「${esc(f?f.name:'')}」关联（${rows.length} 条）`
     : (xg
       ? `跨表组${xGroupNumbers()[xg.id]||'?'} · 按「${esc(xFieldName(xg)||'')}」关联（${rows.length} 条）`
       : `组${groupNumbers(t)[gid]||'?'} · 按「${esc(f?f.name:'')}」关联（${rows.length} 条）`);
@@ -6606,6 +6631,14 @@ function dissolveGroup(tableId, fieldId, gid, ev){
       if(!Object.keys(x.links).length) x.links = {};
     }
   });
+  // 这一组如果同时是跨表组（成员分布在多张表），解散就要整组清掉，
+  // 否则其它表那边还挂着一个"只有别人的组" ✗
+  db.xgroups = (db.xgroups||[]).filter(x=>String(x.id) !== String(gid));
+  (db.tables||[]).forEach(tx=>(tx.rows||[]).forEach(rx=>{
+    if(!rx || !rx.links) return;
+    Object.keys(rx.links).forEach(k=>{ if(String(rx.links[k])===String(gid)) delete rx.links[k]; });
+    if(!Object.keys(rx.links).length) rx.links = {};
+  }));
   releaseGroupNoIfGone(gid);
   closeGroupPanel();
   save(); renderTable(t);
@@ -6617,7 +6650,15 @@ function unlinkMemberFromGroup(tableId, rowId, fieldId, gid, ev){
   const r = t.rows.find(x=>x.id===rowId); if(!r || !r.links) return;
   if(r.links[fieldId]===gid) delete r.links[fieldId];
   else if(r.links[fieldId]==null && r.links.__any__===gid) delete r.links.__any__;
+  // 这一行可能用别的字段挂着同一个组（跨表组里字段名两边不同），一起清掉
+  Object.keys(r.links).forEach(k=>{ if(String(r.links[k])===String(gid)) delete r.links[k]; });
   if(!Object.keys(r.links).length) r.links = {};
+  // 跨表组的成员名单里也要移除，否则另一张表点组别号还能看到他 ✗
+  const xgDel = (db.xgroups||[]).find(x=>String(x.id)===String(gid));
+  if(xgDel){
+    xgDel.rows = xgDel.rows.filter(m=>!(String(m.t)===String(tableId) && String(m.r)===String(rowId)));
+    if(xgDel.rows.length <= 1) db.xgroups = db.xgroups.filter(x=>x.id!==xgDel.id);
+  }
   const members = t.rows.filter(x=>x.links && (x.links[fieldId]===gid || (x.links[fieldId]==null && x.links.__any__===gid)));
   if(members.length <= 1){
     members.forEach(x=>{
@@ -7105,6 +7146,13 @@ function unlinkXMember(gid, xt, xr, ev){
   if(ev){ ev.stopPropagation(); ev.preventDefault(); }
   const g = (db.xgroups||[]).find(x=>x.id===gid); if(!g) return;
   g.rows = g.rows.filter(m=>!(m.t===xt && m.r===xr));
+  // 那一行上的组标记也要清掉，否则角标还在、组面板又把他算回来 ✗
+  const xtb = db.tables.find(x=>x.id===xt);
+  const xrow = xtb && xtb.rows.find(x=>x.id===xr);
+  if(xrow && xrow.links){
+    Object.keys(xrow.links).forEach(k=>{ if(String(xrow.links[k])===String(gid)) delete xrow.links[k]; });
+    if(!Object.keys(xrow.links).length) xrow.links = {};
+  }
   if(g.rows.length <= 1) db.xgroups = db.xgroups.filter(x=>x.id!==gid);
   closeGroupPanel();
   save(); render();
@@ -7216,6 +7264,16 @@ function finishLinkMode(){
     if(r.links.__any__ && m.fieldId!=='__any__'){ r.links[m.fieldId] = r.links.__any__; }
     r.links[m.fieldId] = gid;
     n++;
+  }
+  /* ⚠️ 如果这一组是"跨表组"（在 db.xgroups 里），新成员也要写进成员名单 ✗
+     否则从另一张表点组别号看不到他（真机 2026-10-24：李四—王五关联后，张三的组里没有王五）
+     组面板列成员读的是 xgroups.rows，不只是行上的 links */
+  const xgSame = (db.xgroups||[]).find(x=>String(x.id) === String(gid));
+  if(xgSame){
+    m.picked.forEach(rid=>{
+      const r = t.rows.find(x=>x.id===rid); if(!r) return;
+      if(!xgSame.rows.some(mm=>String(mm.t)===String(t.id) && String(mm.r)===String(rid))) xgSame.rows.push({ t: t.id, r: rid });
+    });
   }
   t.updatedAt = Date.now(); save();
   const keepQ = m.q;
