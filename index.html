@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-24.2</title>
+<title>轻量数据库 · v2026-10-24.3</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -983,7 +983,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-24.2">v2026-10-24.2</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-24.3">v2026-10-24.3</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -5586,7 +5586,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-24.2</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-24.3</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -6549,8 +6549,27 @@ function renderGroupPanel(tableId, fieldId, gid, xg, ev, localTitle, anchorT){
 }
 function showGroupMembers(tableId, fieldId, gid, ev){
   const t = db.tables.find(x=>x.id===tableId); if(!t) return;
-  const xgs = (db.xgroups||[]).filter(g=>g.rows.some(m=>m.t===tableId && (()=>{const rr=t.rows.find(x=>x.id===m.r); return !!(rr&&rr.links&&(rr.links[fieldId]===gid||(rr.links[fieldId]==null&&rr.links.__any__===gid)));})()));
-  renderGroupPanel(tableId, fieldId, gid, xgs[0]||null, ev, true);
+  /* ⚠️ 直接按 id 找这一组的跨表条目 ✗ 以前用"本表某行的 links 指向 gid"来推断，
+     只要有行挂着这个 gid 就会把**别的组**也匹配上（真机 2026-10-24：组面板混进别的组的成员） */
+  const xg = (db.xgroups||[]).find(g=>String(g.id) === String(gid)) || null;
+  renderGroupPanel(tableId, fieldId, gid, xg, ev, true);
+}
+/* 把某条记录滚到可视区中间并闪一下（编辑保存后用，让用户看到"就是这条"） */
+function focusRow(tid, rid){
+  const tr = document.querySelector('#grid tbody tr[data-rid="'+rid+'"]');
+  if(!tr) return;
+  const sc = tr.closest('.table-scroll');
+  if(sc){
+    const h = tr.offsetHeight || 40;
+    const want = tr.offsetTop - (sc.clientHeight - h) / 2;
+    const max = Math.max(0, sc.scrollHeight - sc.clientHeight);
+    const top = Math.max(0, Math.min(want, max));
+    // 只在这一行已经跑出可视区时才滚，别把用户手动滚好的位置又动了
+    const out = tr.offsetTop < sc.scrollTop || (tr.offsetTop + h) > (sc.scrollTop + sc.clientHeight);
+    if(out) sc.scrollTop = top;
+  }
+  tr.classList.add('flash-row');
+  setTimeout(()=>tr.classList.remove('flash-row'), 1900);
 }
 function jumpToRecord(tid, rid, ev){
   if(ev){ ev.stopPropagation(); ev.preventDefault(); }
@@ -7224,9 +7243,31 @@ function finishLinkMode(){
         if(g0){ gid = g0; break; }
       }
     }
+    /* ⚠️ 还要看**被关联的那一方**（别的表里那一行）是不是已经在某个组里 ✗
+       真机 2026-10-24：「张三、李四、王五在同一表格关联，陈六在另一表关联张三 →
+       陈六和张三成立了新组号，李四王五看不到陈六」。
+       以前只查本表（陈六所在表）的行，看不到张三已经有组 → uid() 另起一组 ✗ */
+    if(!gid){
+      for(const p of m.picked){
+        if(!p || typeof p!=='object') continue;
+        const g0 = xgroupGidOfRow(p.t, p.r);
+        if(g0){ gid = g0; break; }
+      }
+    }
     if(!gid) gid = uid();
     let xg0 = (db.xgroups||[]).find(x=>x.id===gid);
-    if(!xg0){ xg0 = { id:gid, fieldId:m.fieldId, rows:[] }; (db.xgroups = db.xgroups||[]).push(xg0); }
+    if(!xg0){
+      // 新建跨表条目时，字段名沿用"原来那一组"用的字段（从行标记里反查），别硬用本表的
+      let fld0 = m.fieldId;
+      for(const rr of rows){
+        const tb = db.tables.find(x=>x.id===rr.t); if(!tb) continue;
+        const row = tb.rows.find(x=>x.id===rr.r); if(!row || !row.links) continue;
+        const k = Object.keys(row.links).find(kk=>String(row.links[kk])===String(gid));
+        if(k){ fld0 = k; break; }
+      }
+      xg0 = { id:gid, fieldId:fld0, rows:[] };
+      (db.xgroups = db.xgroups||[]).push(xg0);
+    }
     rows.forEach(mb=>{ if(!xg0.rows.some(x=>x.t===mb.t && x.r===mb.r)) xg0.rows.push(mb); });
     rows.forEach(mb=>{
       if(mb.t !== t.id) return;                       // 跨表那侧的行不用 links（那边靠 xgroups 认）
@@ -7234,6 +7275,8 @@ function finishLinkMode(){
       if(!rr.links) rr.links = {};
       rr.links[m.fieldId] = gid;
     });
+    // 对方表里"这一组的其它成员"也补上组标记（老数据可能只有名单、行上没标记）
+    Array.from(new Set(rows.map(mb=>mb.t))).forEach(tid=>healXGroupLinks(tid, gid));
     const fld = t.fields.find(x=>x.id===m.fieldId);
     const srcRow = t.rows.find(x=>x.id===m.anchorId);
     const srcName = srcRow && t.fields[0] ? (srcRow.values[t.fields[0].id]||'') : '';
@@ -7969,7 +8012,7 @@ function openRecordModal(tableId, rowId){
   if(!isEdit && t.rows.length) lastRow = t.rows[t.rows.length-1];
   openModal(`
    <form class="modal rec-modal" autocomplete="off" data-table="${t.id}" data-fuid="${_fuid}" onsubmit="saveRecord('${t.id}','${rowId||''}'); return false;">
-     <div class="modal-head"><h2>${isEdit?'编辑记录':'新建记录'}</h2>${isEdit?`<span class="rec-head-opts"><label class="rec-opt" title="编辑保存后自动进入新建记录继续录入"><input type="checkbox" id="rec-opt-editcont" ${localStorage.getItem('lighter-db-opt-editcont')==='0'?'':'checked'}><span class="sw"></span>继续增加</label></span>`:''}${!isEdit?`<span class="rec-head-opts"><label class="rec-opt" title="保存后自动进入下一条"><input type="checkbox" id="rec-opt-continue" ${localStorage.getItem('lighter-db-opt-continue')==='0'?'':'checked'}><span class="sw"></span>连续输入</label><label class="rec-opt" title="显示上次记录小窗"><input type="checkbox" id="rec-opt-showlast" ${localStorage.getItem('lighter-db-opt-showlast')==='0'?'':'checked'}><span class="sw"></span>上次记录</label></span>`:''}<button type="button" class="icon-btn" onclick="closeModal()" title="关闭">${svg('i-x')}</button></div>
+     <div class="modal-head"><h2>${isEdit?'编辑记录':'新建记录'}</h2>${isEdit?`<span class="rec-head-opts"><label class="rec-opt" title="编辑保存后自动进入新建记录继续录入"><input type="checkbox" id="rec-opt-editcont" ${localStorage.getItem('lighter-db-opt-editcont')==='1'?'checked':''}><span class="sw"></span>继续增加</label></span>`:''}${!isEdit?`<span class="rec-head-opts"><label class="rec-opt" title="保存后自动进入下一条"><input type="checkbox" id="rec-opt-continue" ${localStorage.getItem('lighter-db-opt-continue')==='0'?'':'checked'}><span class="sw"></span>连续输入</label><label class="rec-opt" title="显示上次记录小窗"><input type="checkbox" id="rec-opt-showlast" ${localStorage.getItem('lighter-db-opt-showlast')==='0'?'':'checked'}><span class="sw"></span>上次记录</label></span>`:''}<button type="button" class="icon-btn" onclick="closeModal()" title="关闭">${svg('i-x')}</button></div>
      <div class="modal-body">
        ${isEdit && row.no!=null ? `<div class="rec-no">编号 ${row.no}</div>` : ''}
        <div class="rec-fields">
@@ -9994,7 +10037,10 @@ function saveRecord(tableId, rowId){
   save();
   // 记录已真正落盘 —— 「回车」闸门的冷却/复位由调用方(enterGateDone)负责
   const wasEdit = !!rowId;
-  const cont = wasEdit ? localStorage.getItem('lighter-db-opt-editcont') !== '0' : localStorage.getItem('lighter-db-opt-continue') !== '0';  // 保存后是否自动进入下一条
+  /* 编辑保存后**默认不进下一条**（要连续录入得手动勾「继续增加」）✗
+     以前默认勾着 → 改完一条就被弹到一张空白新表单上，用户感觉"编辑完跑到别的记录去了"
+     （真机 2026-10-24）。新建记录那侧「连续输入」保持默认勾选（那是主要录入方式） */
+  const cont = wasEdit ? localStorage.getItem('lighter-db-opt-editcont') === '1' : localStorage.getItem('lighter-db-opt-continue') !== '0';
   // 连续录入（新建）：**原地重置**表单，不关弹窗、不重建识别框 ——
   // 重建会把识别框换掉，手机键盘会收起、正在进行的语音听写也会断 ✗。
   if(!wasEdit && cont && voiceContinueOn() && resetRecordModalInPlace(tableId)){
@@ -10010,7 +10056,9 @@ function saveRecord(tableId, rowId){
   const _oldLeft = _oldModal ? _oldModal.getBoundingClientRect().left : null;
   closeModal();
   renderTable(t); // 只重绘当前表，避免整页 render() 按 hash 切走视图
-  if(!cont) return true;
+  // 编辑保存后把视图**定位回刚改的那条记录**（滚动到它 + 闪一下），别让人找不着
+  if(wasEdit) setTimeout(()=>{ try{ focusRow(tableId, rowId); }catch(e){} }, 60);
+  if(!cont){ toast(wasEdit ? '已保存修改' : '已添加 1 条记录'); return true; }
   openRecordModal(tableId, '');
   if(_oldAnchor != null){
     const nm = document.querySelector('#modal-root .modal');
