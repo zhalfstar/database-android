@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-25.5</title>
+<title>轻量数据库 · v2026-10-25.6</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -411,6 +411,8 @@ table.grid .g-num.fam{background:#fff1e0;color:#b35c00;right:auto;left:0;width:a
 /* 「点称谓」弹出的小菜单：改称谓 / 设为户主 / 改户主性别 */
 #kin-role-menu{position:fixed;z-index:1002;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.18);padding:6px;min-width:132px;max-height:62vh;overflow:auto;font-size:13px;animation:menuPop .16s ease}
 #kin-role-menu .kin-title{font-size:11px;color:var(--muted);padding:4px 8px 6px}
+/* 分组小标题：菜单要滚的时候粘在顶上，省得翻着翻着不知道到哪一组了 */
+#kin-role-menu .kin-sec{position:sticky;top:-6px;z-index:1;background:var(--panel);padding:8px 8px 3px;font-size:11px;color:var(--muted);letter-spacing:.5px}
 #kin-role-menu .kin-row{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;border:none;background:transparent;text-align:left;padding:7px 8px;border-radius:6px;cursor:pointer;color:var(--text);font-size:13px}
 #kin-role-menu .kin-row:hover{background:var(--panel2)}
 #kin-role-menu .kin-tick{color:#b35c00;font-weight:700}
@@ -1012,7 +1014,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-25.5">v2026-10-25.5</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-25.6">v2026-10-25.6</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -5631,7 +5633,7 @@ function openHelp(){
     '<h3 style="margin:16px 0 8px">记录关联</h3>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字分组</b>：数字列中数值相同的记录会自动成组，点击组可查看成员、移除成员或解散整组——适合对账、查重</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>跨表关联</b>：长按某条记录 →「关联到其他记录」，可把不同表里的记录互相挂接、查看和解绑</p>'+
-    '<p style="margin:4px 0;font-size:13px">• <b>家庭关系（血缘）</b>：点某条记录 →「<b>家庭关系</b>」→ 把它设为<b>户主</b>（选男/女），同一屏里选「他们与户主的关系」、勾上家人，一次就能建好一户（不勾人也可以，建好后会直接进"增加成员"）。<b>两人之间的关系会自动推出来</b>：户主与儿子是父子，再加儿媳就自动是<b>公媳</b>（户主为女时是婆媳）、再加孙子自动是<b>爷孙</b>；兄弟姐妹的配偶也有专门称谓 —— <b>嫂子、弟媳、姐夫、妹夫</b>（两个媳妇之间显示<b>妯娌</b>，两个女婿之间显示<b>连襟</b>）</p>'+
+    '<p style="margin:4px 0;font-size:13px">• <b>家庭关系（血缘）</b>：点某条记录 →「<b>家庭关系</b>」→ 把它设为<b>户主</b>（选男/女），同一屏里选「他们与户主的关系」、勾上家人，一次就能建好一户（不勾人也可以，建好后会直接进"增加成员"）。<b>两人之间的关系会自动推出来</b>：户主与儿子是父子，再加儿媳就自动是<b>公媳</b>（户主为女时是婆媳）、再加孙子自动是<b>爷孙</b>；兄弟姐妹的配偶也有专门称谓 —— <b>嫂子、弟媳、姐夫、妹夫</b>（两个媳妇之间显示<b>妯娌</b>，两个女婿之间显示<b>连襟</b>）；旁系长辈/晚辈也有 —— <b>叔伯、姑妈</b>（父亲这边）、<b>舅舅、姨妈</b>（母亲这边）、<b>侄子、侄女</b>，<b>把儿子设成户主</b>时，原来的兄弟会自动变成他的<b>叔伯</b>（户主为女时是舅舅）</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>家庭关系怎么用</b>：① 行左上角橙色「<b>家1</b>」角标 = 这一户；<b>点谁的角标，就以谁为中心</b>看其他人和他的关系（点李四的角标就显示"张三与李四：夫妻、张小明与李四：母子…"）。② 面板里<b>点称谓</b>可以直接改成别的称谓，也能「设为本户户主」（换户主后成员称谓会按新户主自动重算）。③「增加成员」里选好称谓后<b>勾人就行</b>，勾中的会进"待加入清单"，可以换称谓再勾一批，最后点一次「全部加入」。④ 成员行左边有个<b>小把手（⠿）</b>，按住上下拖就能<b>调整成员顺序</b>（户主固定在最上面）；按住面板的<b>标题栏</b>可以把面板挪开，免得挡住要看的行</p>'+
     '<h3 style="margin:16px 0 8px">字段与表头</h3>'+
     '<p style="margin:4px 0;font-size:13px">• <b>单元格直接编辑（仅电脑版）</b>：<b>双击某一格</b>就能就地改这一格的内容 —— 回车（或点别处）保存，Esc 取消，Tab 保存并跳到右边一格。数字/日期/时间/是&#8203;否/选项等字段会自动换成对应的输入控件；「公式」字段由公式算出来，不能直接改；图片和签名请双击最左边的编号列打开记录再编辑</p>'+
@@ -5671,7 +5673,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-25.5</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-25.6</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -6714,6 +6716,14 @@ const KIN_ROLES = {
   sisinlaw_y:    { label:'弟媳',   gen:0,  sex:'F', sp:true,   line:'side' },   // 弟弟的妻子
   brolaw_o:      { label:'姐夫',   gen:0,  sex:'M', sp:true,   line:'side' },   // 姐姐的丈夫
   brolaw_y:      { label:'妹夫',   gen:0,  sex:'M', sp:true,   line:'side' },   // 妹妹的丈夫
+  /* 旁系长辈（叔伯/姑妈=父系，舅舅/姨妈=母系）和旁系晚辈（侄子/侄女）。
+     伯父/叔叔、姑妈/舅舅/姨妈 本来还要分长幼，数据里没有年龄 → 男性合并成「叔伯」 */
+  uncle_p:       { label:'叔伯',   gen:-1, sex:'M',            line:'side' },   // 父亲的兄弟
+  aunt_p:        { label:'姑妈',   gen:-1, sex:'F',            line:'side' },   // 父亲的姐妹
+  uncle_mat:     { label:'舅舅',   gen:-1, sex:'M',            line:'side' },   // 母亲的兄弟
+  aunt_mat:      { label:'姨妈',   gen:-1, sex:'F',            line:'side' },   // 母亲的姐妹
+  nephew:        { label:'侄子',   gen:1,  sex:'M',            line:'side' },   // 兄弟的儿子
+  niece:         { label:'侄女',   gen:1,  sex:'F',            line:'side' },   // 兄弟的女儿
   dil:           { label:'儿媳',   gen:1,  sex:'F', sp:true,   line:'direct' },
   sil:           { label:'女婿',   gen:1,  sex:'M', sp:true,   line:'direct' },
   grandson:      { label:'孙子',   gen:2,  sex:'M',            line:'direct' },
@@ -6721,8 +6731,23 @@ const KIN_ROLES = {
   grandfather:   { label:'祖父',   gen:-2, sex:'M',            line:'direct' },
   grandmother:   { label:'祖母',   gen:-2, sex:'F',            line:'direct' }
 };
-const KIN_ORDER = ['spouse','son','daughter','dil','sil','grandson','granddaughter','father','mother',
-                   'brother','sister','sisinlaw_o','sisinlaw_y','brolaw_o','brolaw_y','grandfather','grandmother'];
+/* 称谓菜单按"关系圈"分组显示（23 个称谓平铺太长，手机上要翻两屏）
+   ⚠️ KIN_ORDER 由它摊平而来：面板里新成员的插入位置、各处下拉的顺序都跟着它 */
+const KIN_GROUPS = [
+  { t:'配偶', roles:['spouse'] },
+  { t:'晚辈', roles:['son','daughter','dil','sil','grandson','granddaughter','nephew','niece'] },
+  { t:'长辈', roles:['father','mother','uncle_p','aunt_p','uncle_mat','aunt_mat','grandfather','grandmother'] },
+  { t:'同辈', roles:['brother','sister','sisinlaw_o','sisinlaw_y','brolaw_o','brolaw_y'] }
+];
+const KIN_ORDER = KIN_GROUPS.reduce((a, g)=>a.concat(g.roles), []);
+/* 旁系长辈和晚辈之间的"叔侄/姑侄/舅甥/姨甥"标签 */
+const KIN_UNCLE_LABEL = { uncle_p:'叔侄', aunt_p:'姑侄', uncle_mat:'舅甥', aunt_mat:'姨甥' };
+/* 称谓下拉（增加成员 / 建立家庭）：同样按组显示，用 <optgroup> 分组 */
+function kinOptionsHtml(sel){
+  return KIN_GROUPS.map(g=>'<optgroup label="' + g.t + '">' +
+    g.roles.map(k=>'<option value="' + k + '"' + (k === sel ? ' selected' : '') + '>' + KIN_ROLES[k].label + '</option>').join('') +
+    '</optgroup>').join('');
+}
 /* 显式的"一对夫妻"组合（同代异性只有这几种才是夫妻，其余是兄妹/姐弟） */
 const KIN_COUPLES = [['head','spouse'],['father','mother'],['son','dil'],['daughter','sil']];
 /* 姻亲（兄弟姐妹的配偶）见 KIN_ROLES 里的 sisinlaw_o / sisinlaw_y / brolaw_o / brolaw_y
@@ -6782,13 +6807,21 @@ function kinBetween(roleA, roleB, headSex){
     if(up.line === 'side' || down.line === 'side'){
       const side = up.line === 'side' ? up : down;
       if(side.sp) return side.sex === 'F' ? '婶侄' : '姻亲';   // 嫂子/弟媳 → 婶侄；姐夫/妹夫 → 姻亲
+      const lab = KIN_UNCLE_LABEL[side.role];                  // 叔伯→叔侄、姑妈→姑侄、舅舅→舅甥、姨妈→姨甥
+      if(lab) return lab;
       return up.sex === 'F' ? '姑侄' : '叔侄';                // 旁系差一辈
     }
     if(down.sp) return down.sex === 'F' ? (up.sex === 'M' ? '公媳' : '婆媳') : '翁婿';
     if(down.sex === 'M') return up.sex === 'M' ? '父子' : '母子';
     return up.sex === 'M' ? '父女' : '母女';
   }
-  if(span === 2) return '爷孙';
+  if(span === 2){
+    // 叔伯 vs 侄子 这种（两边都隔着一层旁系）→ 还是叔侄，不是爷孙
+    const s2 = up.line === 'side' ? up : (down.line === 'side' ? down : null);
+    const lab2 = s2 && KIN_UNCLE_LABEL[s2.role];
+    if(lab2) return lab2;
+    return '爷孙';
+  }
   return '亲戚';
 }
 /* 家庭的固定编号（户1、户2…），一旦分配就不变 —— 和组别号同样的道理 */
@@ -6906,15 +6939,29 @@ function roleRelative(newHeadRole, oldRole, headSex, absSp, isPartner){
   if(isPartner) return 'spouse';
   const N = kinInfo(newHeadRole, headSex), O = kinInfo(oldRole, headSex);
   const d = O.gen - N.gen;                       // 这个人比新户主晚几代
-  /* 旁系（兄弟/姐妹/嫂子/弟媳/姐夫/妹夫）跨代没有对应称谓（叔伯、姑妈、侄子…表里没有）
-     → **原样保留**，别硬套成"父亲/儿子"（那比留着更离谱，而且换回来也回不去）✗ */
-  if(O.line === 'side') return oldRole;
+  /* 旁系（兄弟/姐妹/姻亲/叔伯/姑妈/舅舅/姨妈/侄子/侄女）：只有两种方向能**明确**推出来，
+     其余一律原样保留 —— 表里没有的称谓（婶婶/舅妈/堂兄弟…）硬套成"父亲/儿子"比留着更离谱，
+     而且换回来也回不去 ✗ */
+  if(O.line === 'side'){
+    // ① 新户主是原户主的儿女 → 这位就是"他父母的兄弟姐妹"
+    if(d === -1 && N.gen === 1 && N.line === 'direct' && !absSp){
+      return headSex === 'M' ? (O.sex === 'M' ? 'uncle_p' : 'aunt_p')     // 父亲这边：叔伯 / 姑妈
+                             : (O.sex === 'M' ? 'uncle_mat' : 'aunt_mat'); // 母亲这边：舅舅 / 姨妈
+    }
+    // ② 新户主是原户主的长辈（父母）→ 这位也是他的孩子
+    if(d === 1 && N.gen === -1){
+      return absSp ? (O.sex === 'F' ? 'dil' : 'sil') : (O.sex === 'M' ? 'son' : 'daughter');
+    }
+    if(d !== 0) return oldRole;
+  }
   if(d === 0){
     // 嫁娶进来、又不是新户主的配偶 → 兄弟的妻子 / 姐妹的丈夫
     if(absSp) return O.sex === 'F' ? 'sisinlaw_y' : 'brolaw_y';
     return O.sex === 'M' ? 'brother' : 'sister';
   }
   if(d === 1){
+    // 新户主是原户主的兄弟姐妹 → 原户主的孩子是"侄子/侄女"（不是儿子）
+    if(N.gen === 0 && N.line === 'side' && !absSp) return O.sex === 'M' ? 'nephew' : 'niece';
     if(absSp) return O.sex === 'F' ? 'dil' : 'sil';   // 嫁娶进来的 → 儿媳 / 女婿
     return O.sex === 'M' ? 'son' : 'daughter';        // 本家血亲 → 儿子 / 女儿
   }
@@ -7126,7 +7173,14 @@ function showKinRoleMenu(anchorEl, famId, tid, rid, ev){
     menu.appendChild(row('户主性别：男', fam.headSex !== 'F', ()=>setFamilyHeadSex(fam.id, 'M')));
     menu.appendChild(row('户主性别：女', fam.headSex === 'F', ()=>setFamilyHeadSex(fam.id, 'F')));
   } else {
-    KIN_ORDER.forEach(k=>menu.appendChild(row(KIN_ROLES[k].label, cur === k, ()=>setFamilyRole(fam.id, tid, rid, k))));
+    // 23 个称谓平铺太长 → 按「配偶/晚辈/长辈/同辈」分组（菜单本身 max-height:62vh 可滚）
+    KIN_GROUPS.forEach(g=>{
+      const h = document.createElement('div');
+      h.className = 'kin-title kin-sec';
+      h.textContent = g.t;
+      menu.appendChild(h);
+      g.roles.forEach(k=>menu.appendChild(row(KIN_ROLES[k].label, cur === k, ()=>setFamilyRole(fam.id, tid, rid, k))));
+    });
     menu.appendChild(row('设为本户户主', false, ()=>setFamilyHead(fam.id, tid, rid), 'kin-head'));
   }
   document.body.appendChild(menu);
@@ -7134,7 +7188,7 @@ function showKinRoleMenu(anchorEl, famId, tid, rid, ev){
   const mr = menu.getBoundingClientRect();
   let top = r.bottom + 4;
   let left = Math.max(8, Math.min(window.innerWidth - mr.width - 8, r.left));
-  if(top + mr.height > window.innerHeight - 8) top = Math.max(8, r.top - mr.height - 4);
+  if(top + mr.height > window.innerHeight - 8) top = Math.max(8, Math.min(r.top - mr.height - 4, window.innerHeight - mr.height - 8));
   menu.style.top = top + 'px';
   menu.style.left = left + 'px';
   _famPanelAt = Date.now();
@@ -7198,7 +7252,7 @@ function openFamilyForRow(tid, rid){
   /* 一步到位：选户主性别 + 选"他们与户主的关系" + 勾几个人 → 建立家庭。
      （以前只能先设户主、再逐个加人，"张三与李四夫妻"要点好几次）*/
   window.__famNew = { tid, picked: [] };
-  const opts = KIN_ORDER.map(k=>`<option value="${k}">${KIN_ROLES[k].label}</option>`).join('');
+  const opts = kinOptionsHtml();
   openModal(`<div class="modal small">
     <div class="modal-head"><h2>建立家庭关系</h2><button type="button" class="icon-btn" onclick="closeModal()">${svg('i-x')}</button></div>
     <div class="modal-body">
@@ -7276,7 +7330,7 @@ function openAddFamilyMember(famId){
   if(!fam) return;
   closeGroupPanel();
   window.__famAdd = { famId: fam.id, tid: fam.headT, staged: [] };
-  const opts = KIN_ORDER.map(k=>`<option value="${k}">${KIN_ROLES[k].label}</option>`).join('');
+  const opts = kinOptionsHtml();
   const tabOpts = (db.tables||[]).map(t=>`<option value="${t.id}"${t.id === fam.headT ? ' selected' : ''}>${esc(t.name)}</option>`).join('');
   openModal(`<div class="modal small">
     <div class="modal-head"><h2>增加家庭成员</h2><button type="button" class="icon-btn" onclick="closeModal()">${svg('i-x')}</button></div>
@@ -7355,7 +7409,7 @@ function renderFamStaged(){
     const t = db.tables.find(tb=>tb.id === x.t);
     const r = t && t.rows.find(rr=>rr.id === x.r);
     const nm = r ? rowDisplayName(t, r) : '';
-    const opts = KIN_ORDER.map(k=>`<option value="${k}"${x.role === k ? ' selected' : ''}>${KIN_ROLES[k].label}</option>`).join('');
+    const opts = kinOptionsHtml(x.role);
     return `<div class="fam-stage-row">
       <span class="fam-stage-name">#${r && r.no != null ? r.no : ''} ${esc(nm)}</span>
       <select class="fam-stage-role" onchange="famStageRole(${i}, this.value)">${opts}</select>
