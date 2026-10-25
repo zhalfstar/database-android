@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-25.8</title>
+<title>轻量数据库 · v2026-10-25.9</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -408,21 +408,24 @@ table.grid .g-num.fam{background:#fff1e0;color:#b35c00;right:auto;left:0;width:a
 .fam-stage-row:last-child{border-bottom:none}
 .fam-stage-name{flex:1;min-width:0;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fam-stage-role{width:88px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--text);font-size:12px}
-/* 「点称谓」弹出的小菜单：改称谓 / 设为户主 / 改户主性别 */
-#kin-role-menu{position:fixed;z-index:1002;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.18);padding:6px;min-width:132px;max-height:62vh;overflow:auto;font-size:13px;animation:menuPop .16s ease}
-#kin-role-menu .kin-title{font-size:11px;color:var(--muted);padding:4px 8px 6px}
+/* 「点称谓」弹出的小菜单 / 「增加成员」里的称谓下拉：共用一套 .kin-menu 样式 */
+.kin-menu{position:fixed;z-index:1002;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.18);padding:6px;min-width:132px;max-height:62vh;overflow:auto;font-size:13px;animation:menuPop .16s ease}
+.kin-menu .kin-title{font-size:11px;color:var(--muted);padding:4px 8px 6px}
 /* 分组小标题：点一下收起/展开那一组；菜单要滚的时候粘在顶上，省得翻着翻着不知道到哪一组了 */
-#kin-role-menu .kin-sec{display:flex;align-items:center;gap:5px;position:sticky;top:-6px;z-index:1;background:var(--panel);padding:8px 8px 4px;font-size:11px;color:var(--muted);letter-spacing:.5px;cursor:pointer;user-select:none;-webkit-user-select:none;border-radius:6px}
-#kin-role-menu .kin-sec:hover{color:var(--text);background:var(--panel2)}
-#kin-role-menu .kin-sec.open{color:var(--text);font-weight:600}
+.kin-menu .kin-sec{display:flex;align-items:center;gap:5px;position:sticky;top:-6px;z-index:1;background:var(--panel);padding:8px 8px 4px;font-size:11px;color:var(--muted);letter-spacing:.5px;cursor:pointer;user-select:none;-webkit-user-select:none;border-radius:6px}
+.kin-menu .kin-sec:hover{color:var(--text);background:var(--panel2)}
+.kin-menu .kin-sec.open{color:var(--text);font-weight:600}
 /* 小三角用 border 画：字体里的 ▸ 在小字号下会糊成一个点 ✗ */
-#kin-role-menu .kin-caret{width:0;height:0;flex:0 0 auto;border-left:5px solid currentColor;border-top:4px solid transparent;border-bottom:4px solid transparent;opacity:.65;transition:transform .15s}
-#kin-role-menu .kin-sec.open .kin-caret{transform:rotate(90deg)}
-#kin-role-menu .kin-box{padding:0 0 3px}
-#kin-role-menu .kin-row{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;border:none;background:transparent;text-align:left;padding:7px 8px;border-radius:6px;cursor:pointer;color:var(--text);font-size:13px}
-#kin-role-menu .kin-row:hover{background:var(--panel2)}
-#kin-role-menu .kin-tick{color:#b35c00;font-weight:700}
-#kin-role-menu .kin-head{margin:0 0 2px;border-bottom:1px solid var(--line);border-radius:6px 6px 0 0;padding:9px 8px;color:#b35c00;font-weight:600}
+.kin-caret{width:0;height:0;flex:0 0 auto;border-left:5px solid currentColor;border-top:4px solid transparent;border-bottom:4px solid transparent;opacity:.65;transition:transform .15s}
+.kin-menu .kin-sec.open .kin-caret{transform:rotate(90deg)}
+.kin-menu .kin-box{padding:0 0 3px}
+.kin-menu .kin-row{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;border:none;background:transparent;text-align:left;padding:7px 8px;border-radius:6px;cursor:pointer;color:var(--text);font-size:13px}
+.kin-menu .kin-row:hover{background:var(--panel2)}
+.kin-menu .kin-tick{color:#b35c00;font-weight:700}
+.kin-menu .kin-head{margin:0 0 2px;border-bottom:1px solid var(--line);border-radius:6px 6px 0 0;padding:9px 8px;color:#b35c00;font-weight:600}
+/* 「增加成员」里的称谓下拉按钮（长得像个 select） */
+.kin-pick-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;cursor:pointer}
+.kin-pick-btn .kin-caret{transform:rotate(90deg)}   /* 下拉按钮上的三角朝下 */
 .lm-row2{display:flex;gap:8px;align-items:center}
 #link-mode-bar #link-search{flex:1;box-sizing:border-box;padding:7px 12px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;font-family:inherit;background:var(--input,#fff);color:var(--text);min-width:0}
 #link-mode-bar #link-search:focus{outline:none;border-color:#4285F4}
@@ -1020,7 +1023,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-25.8">v2026-10-25.8</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-25.9">v2026-10-25.9</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -1801,6 +1804,7 @@ function openModal(inner){
   }
 }
 function closeModal(){
+  const _kp = document.getElementById('kin-pick-menu'); if(_kp) _kp.remove();   // 弹窗关了，称谓下拉不能留成孤儿
   // exit batch mode
   if(typeof db !== 'undefined' && db && db.tables){
     db.tables.forEach(t=>{
@@ -5640,7 +5644,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>数字分组</b>：数字列中数值相同的记录会自动成组，点击组可查看成员、移除成员或解散整组——适合对账、查重</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>跨表关联</b>：长按某条记录 →「关联到其他记录」，可把不同表里的记录互相挂接、查看和解绑</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>家庭关系（血缘）</b>：点某条记录 →「<b>家庭关系</b>」→ 把它设为<b>户主</b>（选男/女），同一屏里选「他们与户主的关系」、勾上家人，一次就能建好一户（不勾人也可以，建好后会直接进"增加成员"）。<b>两人之间的关系会自动推出来</b>：户主与儿子是父子，再加儿媳就自动是<b>公媳</b>（户主为女时是婆媳）、再加孙子自动是<b>爷孙</b>；兄弟姐妹的配偶也有专门称谓 —— <b>嫂子、弟媳、姐夫、妹夫</b>（两个媳妇之间显示<b>妯娌</b>，两个女婿之间显示<b>连襟</b>）；旁系长辈/晚辈也有 —— <b>叔伯、婶婶、姑妈</b>（父亲这边）、<b>舅舅、舅妈、姨妈</b>（母亲这边）、<b>侄子、侄女</b>（兄弟的子女）、<b>外甥、外甥女</b>（姐妹的子女）、<b>堂/表兄弟妹</b>，<b>把儿子设成户主</b>时，原来的兄弟会自动变成他的<b>叔伯</b>（户主为女时是舅舅）、侄子会变成<b>堂兄弟</b>（户主为女时是表兄弟）。称谓菜单按「配偶/晚辈/长辈/同辈」分组，<b>点组名可以收起/展开</b>，「设为本户户主」在最上面</p>'+
-    '<p style="margin:4px 0;font-size:13px">• <b>家庭关系怎么用</b>：① 行左上角橙色「<b>家1</b>」角标 = 这一户；<b>点谁的角标，就以谁为中心</b>看其他人和他的关系（点李四的角标就显示"张三与李四：夫妻、张小明与李四：母子…"）。② 面板里<b>点称谓</b>可以直接改成别的称谓，也能「设为本户户主」（换户主后成员称谓会按新户主自动重算）。③「增加成员」里选好称谓后<b>勾人就行</b>，勾中的会进"待加入清单"，可以换称谓再勾一批，最后点一次「全部加入」。④ 成员行左边有个<b>小把手（⠿）</b>，按住上下拖就能<b>调整成员顺序</b>（户主固定在最上面）；按住面板的<b>标题栏</b>可以把面板挪开，免得挡住要看的行</p>'+
+    '<p style="margin:4px 0;font-size:13px">• <b>家庭关系怎么用</b>：① 行左上角橙色「<b>家1</b>」角标 = 这一户；<b>点谁的角标，就以谁为中心</b>看其他人和他的关系（点李四的角标就显示"张三与李四：夫妻、张小明与李四：母子…"）。② 面板里<b>点称谓</b>可以直接改成别的称谓，也能「设为本户户主」（换户主后成员称谓会按新户主自动重算）。③「增加成员」里<b>点「儿子」那一栏选称谓</b>（配偶一项直接列出，晚辈/长辈/同辈点组名收起展开），选好后<b>勾人就行</b>，勾中的会进"待加入清单"，可以换称谓再勾一批，最后点一次「全部加入」。④ 成员行左边有个<b>小把手（⠿）</b>，按住上下拖就能<b>调整成员顺序</b>（户主固定在最上面）；按住面板或「称谓/户主」小菜单的<b>标题栏</b>都能把它挪开，免得挡住要看的行</p>'+
     '<h3 style="margin:16px 0 8px">字段与表头</h3>'+
     '<p style="margin:4px 0;font-size:13px">• <b>单元格直接编辑（仅电脑版）</b>：<b>双击某一格</b>就能就地改这一格的内容 —— 回车（或点别处）保存，Esc 取消，Tab 保存并跳到右边一格。数字/日期/时间/是&#8203;否/选项等字段会自动换成对应的输入控件；「公式」字段由公式算出来，不能直接改；图片和签名请双击最左边的编号列打开记录再编辑</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>编辑整条记录</b>：双击最左边的<b>编号列</b>（手机上双击任意处）打开记录弹窗，可一次改多个字段、写语音、加关联</p>'+
@@ -5679,7 +5683,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-25.8</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-25.9</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -7175,30 +7179,35 @@ function bindFamReorder(panel, famId){
   });
 }
 /* 面板本身也能拖（按住标题栏）：手机上面板常常正好盖住要看的行 */
-function bindFamPanelDrag(panel){
-  const title = panel.querySelector('.gp-title');
-  if(!title) return;
-  title.style.cursor = 'move';
-  title.style.touchAction = 'none';
-  title.addEventListener('pointerdown', e=>{
+function bindFamPanelDrag(panel){ bindPopupDrag(panel, panel.querySelector('.gp-title')); }
+/* 浮层拖动（家庭面板的标题栏 / 称谓菜单的标题栏共用）：
+   按住 handle 拖，每帧最多写一次 left/top（面板有大阴影，一帧写多次会一顿一顿的） */
+function bindPopupDrag(el, handle){
+  if(!el || !handle) return;
+  handle.style.cursor = 'move';
+  handle.style.touchAction = 'none';
+  handle.addEventListener('pointerdown', e=>{
     if(e.target.closest('button')) return;
     e.preventDefault();
     const sx = e.clientX, sy = e.clientY;
-    const r = panel.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
     const ox = r.left, oy = r.top;
-    let raf = 0, dx = 0, dy = 0;
+    let raf = 0, dx = 0, dy = 0, moved = false;
     const apply = ()=>{
       raf = 0;
-      const w = panel.offsetWidth, h = panel.offsetHeight;
-      panel.style.left = Math.max(4, Math.min(window.innerWidth  - w - 4, ox + dx)) + 'px';
-      panel.style.top  = Math.max(4, Math.min(window.innerHeight - h - 4, oy + dy)) + 'px';
+      const w = el.offsetWidth, h = el.offsetHeight;
+      el.style.left = Math.max(4, Math.min(window.innerWidth  - w - 4, ox + dx)) + 'px';
+      el.style.top  = Math.max(4, Math.min(window.innerHeight - h - 4, oy + dy)) + 'px';
     };
     const move = ev=>{
       dx = ev.clientX - sx; dy = ev.clientY - sy;
-      if(!raf) raf = requestAnimationFrame(apply);   // 每帧最多写一次 left/top
+      if(Math.abs(dx) + Math.abs(dy) > 3) moved = true;
+      if(!raf) raf = requestAnimationFrame(apply);
     };
     const up = ()=>{
       if(raf){ cancelAnimationFrame(raf); apply(); }
+      // 拖完松手时浏览器会在"公共祖先"上补一个 click，落到浮层外面就会把浮层关掉 ✗
+      if(moved) el._dragAt = Date.now();
       window.removeEventListener('pointermove', move);
       window.removeEventListener('pointerup', up);
       window.removeEventListener('pointercancel', up);
@@ -7207,6 +7216,62 @@ function bindFamPanelDrag(panel){
     window.addEventListener('pointerup', up);
     window.addEventListener('pointercancel', up);
   });
+}
+/* 刚拖过这个浮层？（松手那一下的 click 不该被当成"点了外面"） */
+function popupJustDragged(el){ return !!(el && el._dragAt && (Date.now() - el._dragAt) < 500); }
+/* 把浮层放到锚点下方（下面放不下就翻到上面，比屏幕还高就夹进视口） */
+function placePopup(menu, anchorEl){
+  if(!anchorEl || !anchorEl.getBoundingClientRect) return;
+  const r = anchorEl.getBoundingClientRect();
+  const mr = menu.getBoundingClientRect();
+  let top = r.bottom + 4;
+  let left = Math.max(8, Math.min(window.innerWidth - mr.width - 8, r.left));
+  if(top + mr.height > window.innerHeight - 8){
+    top = Math.max(8, Math.min(r.top - mr.height - 4, window.innerHeight - mr.height - 8));
+  }
+  menu.style.top = top + 'px';
+  menu.style.left = left + 'px';
+}
+/* ===== 称谓行 / 分组：菜单和「增加成员」的下拉共用 ===== */
+function kinRowEl(label, on, fn, cls){
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'kin-row' + (cls ? ' ' + cls : '');
+  if(on) b.innerHTML = label + '<span class="kin-tick">✓</span>';
+  else b.textContent = label;
+  b.onclick = (e)=>{ e.stopPropagation(); fn(); };
+  return b;
+}
+/* 只有一项的组（配偶）直接列出来，不套组名 —— 一个下拉菜单里就一行，没必要 */
+function kinBuildGroups(box, cur, openT, onPick){
+  KIN_GROUPS.forEach(g=>{
+    if(g.roles.length === 1){
+      const k = g.roles[0];
+      box.appendChild(kinRowEl(KIN_ROLES[k].label, cur === k, ()=>onPick(k)));
+      return;
+    }
+    const sec = document.createElement('div');
+    sec.className = 'kin-sec' + (g.t === openT ? ' open' : '');
+    sec.innerHTML = '<span class="kin-caret"></span><span>' + g.t + '</span>';
+    const inner = document.createElement('div');
+    inner.className = 'kin-box';
+    inner.style.display = (g.t === openT) ? '' : 'none';
+    g.roles.forEach(k=>inner.appendChild(kinRowEl(KIN_ROLES[k].label, cur === k, ()=>onPick(k))));
+    sec.onclick = (e)=>{
+      e.stopPropagation();
+      const isOpen = inner.style.display !== 'none';
+      inner.style.display = isOpen ? 'none' : '';
+      sec.classList.toggle('open', !isOpen);
+      _kinOpenSec = isOpen ? '' : g.t;
+    };
+    box.appendChild(sec);
+    box.appendChild(inner);
+  });
+}
+/* 默认展开哪一组：手动开过就沿用，否则展开"当前称谓"那一组 */
+function kinOpenGroup(cur){
+  if(_kinOpenSec !== null) return _kinOpenSec;
+  return ((KIN_GROUPS.find(g=>g.roles.indexOf(cur) >= 0) || {}).t) || '';
 }
 /* 点称谓 → 小菜单：改称谓 / 设为户主 / 改户主性别（不用移出再加回来） */
 function showKinRoleMenu(anchorEl, famId, tid, rid, ev){
@@ -7219,59 +7284,27 @@ function showKinRoleMenu(anchorEl, famId, tid, rid, ev){
   const cur = isHead ? '' : (m && m.role) || '';
   const menu = document.createElement('div');
   menu.id = 'kin-role-menu';
-  const row = (label, on, fn, cls)=>{
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'kin-row' + (cls ? ' ' + cls : '');
-    b.textContent = label;
-    if(on) b.innerHTML = label + '<span class="kin-tick">✓</span>';
-    b.onclick = (e)=>{ e.stopPropagation(); menu.remove(); fn(); };
-    return b;
-  };
+  menu.className = 'kin-menu';
+  const close = ()=>menu.remove();
   const title = document.createElement('div');
   title.className = 'kin-title';
-  title.textContent = isHead ? '户主设置' : '称谓 / 户主';
+  title.textContent = isHead ? '户主设置（按住标题栏可拖动）' : '称谓 / 户主（按住标题栏可拖动）';
   menu.appendChild(title);
   if(isHead){
-    menu.appendChild(row('户主性别：男', fam.headSex !== 'F', ()=>setFamilyHeadSex(fam.id, 'M')));
-    menu.appendChild(row('户主性别：女', fam.headSex === 'F', ()=>setFamilyHeadSex(fam.id, 'F')));
+    menu.appendChild(kinRowEl('户主性别：男', fam.headSex !== 'F', ()=>{ close(); setFamilyHeadSex(fam.id, 'M'); }));
+    menu.appendChild(kinRowEl('户主性别：女', fam.headSex === 'F', ()=>{ close(); setFamilyHeadSex(fam.id, 'F'); }));
   } else {
     /* 「设为本户户主」放**最前面** —— 最常用的操作，不用翻到底部去找 */
-    menu.appendChild(row('设为本户户主', false, ()=>setFamilyHead(fam.id, tid, rid), 'kin-head'));
-    /* 分组可以收起：默认展开"当前称谓所在的那一组"，其余收起来（菜单短、好点）；
-       手动开过一组之后就记住它（_kinOpenSec），下次打开还是那组 */
-    const curGroup = (KIN_GROUPS.find(g=>g.roles.indexOf(cur) >= 0) || {}).t;
-    const openT = (_kinOpenSec === null) ? curGroup : _kinOpenSec;
-    KIN_GROUPS.forEach(g=>{
-      const sec = document.createElement('div');
-      sec.className = 'kin-sec' + (g.t === openT ? ' open' : '');
-      sec.innerHTML = '<span class="kin-caret"></span><span>' + g.t + '</span>';
-      const box = document.createElement('div');
-      box.className = 'kin-box';
-      box.style.display = (g.t === openT) ? '' : 'none';
-      g.roles.forEach(k=>box.appendChild(row(KIN_ROLES[k].label, cur === k, ()=>setFamilyRole(fam.id, tid, rid, k))));
-      sec.onclick = (e)=>{
-        e.stopPropagation();
-        const isOpen = box.style.display !== 'none';
-        box.style.display = isOpen ? 'none' : '';
-        sec.classList.toggle('open', !isOpen);
-        _kinOpenSec = isOpen ? '' : g.t;
-      };
-      menu.appendChild(sec);
-      menu.appendChild(box);
-    });
+    menu.appendChild(kinRowEl('设为本户户主', false, ()=>{ close(); setFamilyHead(fam.id, tid, rid); }, 'kin-head'));
+    kinBuildGroups(menu, cur, kinOpenGroup(cur), (k)=>{ close(); setFamilyRole(fam.id, tid, rid, k); });
   }
   document.body.appendChild(menu);
-  const r = anchorEl.getBoundingClientRect();
-  const mr = menu.getBoundingClientRect();
-  let top = r.bottom + 4;
-  let left = Math.max(8, Math.min(window.innerWidth - mr.width - 8, r.left));
-  if(top + mr.height > window.innerHeight - 8) top = Math.max(8, Math.min(r.top - mr.height - 4, window.innerHeight - mr.height - 8));
-  menu.style.top = top + 'px';
-  menu.style.left = left + 'px';
+  placePopup(menu, anchorEl);
+  bindPopupDrag(menu, title);
   _famPanelAt = Date.now();
   const closeOnDoc = (e)=>{
     if(!document.body.contains(menu)){ document.removeEventListener('click', closeOnDoc); return; }
+    if(popupJustDragged(menu)) return;      // 刚拖过标题栏 → 松手那一下的 click 不算"点外面"
     if(menu.contains(e.target) || (anchorEl && anchorEl.contains && anchorEl.contains(e.target))) return;
     menu.remove();
   };
@@ -7330,7 +7363,6 @@ function openFamilyForRow(tid, rid){
   /* 一步到位：选户主性别 + 选"他们与户主的关系" + 勾几个人 → 建立家庭。
      （以前只能先设户主、再逐个加人，"张三与李四夫妻"要点好几次）*/
   window.__famNew = { tid, picked: [] };
-  const opts = kinOptionsHtml();
   openModal(`<div class="modal small">
     <div class="modal-head"><h2>建立家庭关系</h2><button type="button" class="icon-btn" onclick="closeModal()">${svg('i-x')}</button></div>
     <div class="modal-body">
@@ -7341,7 +7373,10 @@ function openFamilyForRow(tid, rid){
         <option value="F">女（儿媳 → 婆媳）</option>
       </select>
       <label class="form-label" style="margin-top:10px">他们与户主的关系</label>
-      <select class="in" id="fam-new-role">${opts}</select>
+      <button type="button" class="in kin-pick-btn" id="fam-new-role-btn" onclick="openRolePick('fam-new-role-btn','fam-new-role','fam-new-role-label',event)">
+        <span id="fam-new-role-label">${esc(KIN_ROLES.son.label)}</span><span class="kin-caret"></span>
+      </button>
+      <input type="hidden" id="fam-new-role" value="son">
       <input class="in" id="fam-new-q" placeholder="搜索姓名…" oninput="renderFamNewCands()" style="margin-top:8px">
       <div id="fam-new-cands" class="imp-opts" style="margin-top:8px;max-height:34vh;overflow:auto"></div>
       <div class="muted" style="font-size:12px;margin-top:8px">可以一次勾多个（都按上面这个关系）；不勾也行，建好户之后再慢慢加。</div>
@@ -7408,13 +7443,15 @@ function openAddFamilyMember(famId){
   if(!fam) return;
   closeGroupPanel();
   window.__famAdd = { famId: fam.id, tid: fam.headT, staged: [] };
-  const opts = kinOptionsHtml();
   const tabOpts = (db.tables||[]).map(t=>`<option value="${t.id}"${t.id === fam.headT ? ' selected' : ''}>${esc(t.name)}</option>`).join('');
   openModal(`<div class="modal small">
     <div class="modal-head"><h2>增加家庭成员</h2><button type="button" class="icon-btn" onclick="closeModal()">${svg('i-x')}</button></div>
     <div class="modal-body">
       <label class="form-label">他们是户主的</label>
-      <select class="in" id="fam-role">${opts}</select>
+      <button type="button" class="in kin-pick-btn" id="fam-role-btn" onclick="openRolePick('fam-role-btn','fam-role','fam-role-label',event)">
+        <span id="fam-role-label">${esc(KIN_ROLES.son.label)}</span><span class="kin-caret"></span>
+      </button>
+      <input type="hidden" id="fam-role" value="son">
       <div class="muted" style="font-size:12px;margin:6px 0 10px">选好称谓后勾人，勾中的会进下面的清单；可以换称谓再勾一批，最后点一次「全部加入」。关系会自动推出来（户主—儿子=父子、户主—儿媳=公媳、户主—孙子=爷孙）。</div>
       <div style="display:flex;gap:6px;align-items:center">
         <select class="in" id="fam-table" onchange="famSwitchTable(this.value)" style="flex:1;min-width:0">${tabOpts}</select>
@@ -7440,6 +7477,36 @@ function famSwitchTable(tid){
 function famCurrentRole(){
   const el = document.getElementById('fam-role');
   return el ? el.value : 'son';
+}
+/* 称谓下拉（「增加成员」和「建立家庭」共用）：点按钮弹出一块 ——
+   配偶只有一项就直接一行，晚辈/长辈/同辈点组名收起展开。
+   ⚠️ 真正存值的是隐藏域（inputId），按钮上只是显示当前称谓 */
+function openRolePick(btnId, inputId, labelId, ev){
+  if(ev){ ev.stopPropagation && ev.stopPropagation(); ev.preventDefault && ev.preventDefault(); }
+  const btn = document.getElementById(btnId);
+  if(!btn) return;
+  const old = document.getElementById('kin-pick-menu');
+  if(old){ old.remove(); return; }              // 再点一下 = 收起
+  const cur = ((document.getElementById(inputId) || {}).value) || 'son';
+  const menu = document.createElement('div');
+  menu.id = 'kin-pick-menu';
+  menu.className = 'kin-menu';
+  kinBuildGroups(menu, cur, kinOpenGroup(cur), (k)=>pickRoleTo(inputId, labelId, k));
+  document.body.appendChild(menu);
+  menu.style.minWidth = Math.max(160, Math.round(btn.getBoundingClientRect().width)) + 'px';
+  placePopup(menu, btn);
+  const closeOnDoc = (e)=>{
+    if(!document.body.contains(menu)){ document.removeEventListener('click', closeOnDoc); return; }
+    if(!document.getElementById(btnId)){ menu.remove(); return; }
+    if(menu.contains(e.target) || btn.contains(e.target)) return;
+    menu.remove();
+  };
+  setTimeout(()=>document.addEventListener('click', closeOnDoc), 0);
+}
+function pickRoleTo(inputId, labelId, k){
+  const el = document.getElementById('kin-pick-menu'); if(el) el.remove();
+  const inp = document.getElementById(inputId); if(inp) inp.value = k;
+  const lab = document.getElementById(labelId); if(lab) lab.textContent = kinLabel(k);
 }
 function renderFamCandidates(){
   const st = window.__famAdd; if(!st) return;
@@ -8374,8 +8441,10 @@ document.addEventListener('click', e=>{
     if(!e.target.closest('#link-done') && !e.target.closest('#link-mode-bar')) cancelLinkMode();
   }
   if(!e.target.closest('#link-panel') && !e.target.closest('#link-mode-bar') && !e.target.closest('#link-done')) closeLinkPanel();
-  // 家庭面板刚打开的那一下（<150ms）不关 —— 见 _famPanelAt 的注释
-  if(!e.target.closest('#group-panel') && Date.now() - _famPanelAt > 150) closeGroupPanel();
+  // 家庭面板刚打开的那一下（<150ms）不关 —— 见 _famPanelAt 的注释；
+  // 刚拖过标题栏的那一下也不关（松手时补发的 click 落在面板外面）
+  if(!e.target.closest('#group-panel') && Date.now() - _famPanelAt > 150 &&
+     !popupJustDragged(document.getElementById('group-panel'))) closeGroupPanel();
 });
 function bindTablePan(scroller){
   if(!scroller || scroller._panBound) return;
