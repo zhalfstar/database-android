@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-25.4</title>
+<title>轻量数据库 · v2026-10-25.5</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1012,7 +1012,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-25.4">v2026-10-25.4</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-25.5">v2026-10-25.5</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -1515,16 +1515,24 @@ function normalizeDb(d){
   /* 家庭关系（血缘）：一"户"一个条目，members 里是**相对户主的称谓**。
      role 必须是 KIN_ROLES 里认识的，否则丢掉（避免脏数据把推导搞乱）。
      ⚠️ `sp`（这个人是不是嫁娶进来的）必须一起收进来 —— 它是"人的属性"，换户主时靠它
-        才能把称谓算对；漏了就会被静默剥掉，来回换一次户主配偶就变成兄弟姐妹 ✗ */
+        才能把称谓算对；漏了就会被静默剥掉，来回换一次户主配偶就变成兄弟姐妹 ✗
+     ⚠️ `ir`（原来的姻亲称谓，嫂子/弟媳/姐夫/妹夫）也要收：她丈夫当户主时她显示"配偶"，
+        这个标记能让她换回来时还是原来那个称谓 */
   d.families = Array.isArray(d.families) ? d.families.filter(f=>f && f.headR).map(f=>({
     id: String(f.id || uid()),
     headT: String(f.headT || ''),
     headR: String(f.headR || ''),
     headSex: f.headSex === 'F' ? 'F' : 'M',
     headSp: f.headSp ? 1 : 0,
+    headIr: kinIsInlaw(String(f.headIr || '')) ? String(f.headIr) : '',
     members: (Array.isArray(f.members) ? f.members : [])
-      .map(m=>({ t: String((m && m.t) || ''), r: String((m && m.r) || ''), role: String((m && m.role) || ''),
-                 sp: (m && m.sp != null) ? (m.sp ? 1 : 0) : kinDefaultSp(String((m && m.role) || '')) }))
+      .map(m=>{
+        const role = String((m && m.role) || '');
+        return { t: String((m && m.t) || ''), r: String((m && m.r) || ''), role,
+                 sp: (m && m.sp != null) ? (m.sp ? 1 : 0) : kinDefaultSp(role),
+                 ir: (m && kinIsInlaw(String(m.ir || ''))) ? String(m.ir)
+                     : (kinIsInlaw(role) ? role : '') };
+      })
       .filter(m=>m.t && m.r && m.role)
   })) : [];
   /* 家庭的固定编号（仿 gno）：户1、户2… 一旦分配就不变 */
@@ -5623,7 +5631,7 @@ function openHelp(){
     '<h3 style="margin:16px 0 8px">记录关联</h3>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字分组</b>：数字列中数值相同的记录会自动成组，点击组可查看成员、移除成员或解散整组——适合对账、查重</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>跨表关联</b>：长按某条记录 →「关联到其他记录」，可把不同表里的记录互相挂接、查看和解绑</p>'+
-    '<p style="margin:4px 0;font-size:13px">• <b>家庭关系（血缘）</b>：点某条记录 →「<b>家庭关系</b>」→ 把它设为<b>户主</b>（选男/女），同一屏里选「他们与户主的关系」、勾上家人，一次就能建好一户（不勾人也可以，建好后会直接进"增加成员"）。<b>两人之间的关系会自动推出来</b>：户主与儿子是父子，再加儿媳就自动是<b>公媳</b>（户主为女时是婆媳）、再加孙子自动是<b>爷孙</b></p>'+
+    '<p style="margin:4px 0;font-size:13px">• <b>家庭关系（血缘）</b>：点某条记录 →「<b>家庭关系</b>」→ 把它设为<b>户主</b>（选男/女），同一屏里选「他们与户主的关系」、勾上家人，一次就能建好一户（不勾人也可以，建好后会直接进"增加成员"）。<b>两人之间的关系会自动推出来</b>：户主与儿子是父子，再加儿媳就自动是<b>公媳</b>（户主为女时是婆媳）、再加孙子自动是<b>爷孙</b>；兄弟姐妹的配偶也有专门称谓 —— <b>嫂子、弟媳、姐夫、妹夫</b>（两个媳妇之间显示<b>妯娌</b>，两个女婿之间显示<b>连襟</b>）</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>家庭关系怎么用</b>：① 行左上角橙色「<b>家1</b>」角标 = 这一户；<b>点谁的角标，就以谁为中心</b>看其他人和他的关系（点李四的角标就显示"张三与李四：夫妻、张小明与李四：母子…"）。② 面板里<b>点称谓</b>可以直接改成别的称谓，也能「设为本户户主」（换户主后成员称谓会按新户主自动重算）。③「增加成员」里选好称谓后<b>勾人就行</b>，勾中的会进"待加入清单"，可以换称谓再勾一批，最后点一次「全部加入」。④ 成员行左边有个<b>小把手（⠿）</b>，按住上下拖就能<b>调整成员顺序</b>（户主固定在最上面）；按住面板的<b>标题栏</b>可以把面板挪开，免得挡住要看的行</p>'+
     '<h3 style="margin:16px 0 8px">字段与表头</h3>'+
     '<p style="margin:4px 0;font-size:13px">• <b>单元格直接编辑（仅电脑版）</b>：<b>双击某一格</b>就能就地改这一格的内容 —— 回车（或点别处）保存，Esc 取消，Tab 保存并跳到右边一格。数字/日期/时间/是&#8203;否/选项等字段会自动换成对应的输入控件；「公式」字段由公式算出来，不能直接改；图片和签名请双击最左边的编号列打开记录再编辑</p>'+
@@ -5663,7 +5671,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-25.4</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-25.5</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -6699,6 +6707,13 @@ const KIN_ROLES = {
   mother:        { label:'母亲',   gen:-1, sex:'F',            line:'direct' },
   brother:       { label:'兄弟',   gen:0,  sex:'M',            line:'side' },
   sister:        { label:'姐妹',   gen:0,  sex:'F',            line:'side' },
+  /* 姻亲（兄弟姐妹的配偶）：gen 0、旁系、嫁娶进来的。
+     ⚠️ 嫂子/弟媳、姐夫/妹夫 本来靠"谁年纪大"区分，但数据里没有年龄，
+        所以由用户自己选；换户主时**原样保留**（见 roleRelative） */
+  sisinlaw_o:    { label:'嫂子',   gen:0,  sex:'F', sp:true,   line:'side' },   // 哥哥的妻子
+  sisinlaw_y:    { label:'弟媳',   gen:0,  sex:'F', sp:true,   line:'side' },   // 弟弟的妻子
+  brolaw_o:      { label:'姐夫',   gen:0,  sex:'M', sp:true,   line:'side' },   // 姐姐的丈夫
+  brolaw_y:      { label:'妹夫',   gen:0,  sex:'M', sp:true,   line:'side' },   // 妹妹的丈夫
   dil:           { label:'儿媳',   gen:1,  sex:'F', sp:true,   line:'direct' },
   sil:           { label:'女婿',   gen:1,  sex:'M', sp:true,   line:'direct' },
   grandson:      { label:'孙子',   gen:2,  sex:'M',            line:'direct' },
@@ -6706,16 +6721,24 @@ const KIN_ROLES = {
   grandfather:   { label:'祖父',   gen:-2, sex:'M',            line:'direct' },
   grandmother:   { label:'祖母',   gen:-2, sex:'F',            line:'direct' }
 };
-const KIN_ORDER = ['spouse','son','daughter','dil','sil','grandson','granddaughter','father','mother','brother','sister','grandfather','grandmother'];
+const KIN_ORDER = ['spouse','son','daughter','dil','sil','grandson','granddaughter','father','mother',
+                   'brother','sister','sisinlaw_o','sisinlaw_y','brolaw_o','brolaw_y','grandfather','grandmother'];
 /* 显式的"一对夫妻"组合（同代异性只有这几种才是夫妻，其余是兄妹/姐弟） */
 const KIN_COUPLES = [['head','spouse'],['father','mother'],['son','dil'],['daughter','sil']];
-/* 称谓 → 他/她的配偶称谓（夫妻配对的反查表） */
-const KIN_PARTNER = { head:'spouse', spouse:'head', father:'mother', mother:'father',
-                      son:'dil', dil:'son', daughter:'sil', sil:'daughter' };
-function kinPartnerRole(role){ return KIN_PARTNER[role] || null; }
+/* 姻亲（兄弟姐妹的配偶）见 KIN_ROLES 里的 sisinlaw_o / sisinlaw_y / brolaw_o / brolaw_y
 /* 这个称谓默认是不是"嫁娶进来的"（1=外来，0=本家血亲）。只在**加入那一刻**用来定初始值，
-   之后跟着人走、换户主时不再变 —— 见 roleRelative 里那段说明 */
-function kinDefaultSp(role){ return (role === 'spouse' || role === 'dil' || role === 'sil') ? 1 : 0; }
+   之后跟着人走、换户主时不再变 —— 见 roleRelative 里那段说明。
+   ⚠️ 不能用 KIN_ROLES[role].sp 查：normalizeDb 在脚本更早的位置就会调它，那会儿 KIN_ROLES 还没初始化 ✗ */
+function kinDefaultSp(role){
+  return (role === 'spouse' || role === 'dil' || role === 'sil' ||
+          role === 'sisinlaw_o' || role === 'sisinlaw_y' ||
+          role === 'brolaw_o' || role === 'brolaw_y') ? 1 : 0;
+}
+/* 同代里的"姻亲"：是兄弟姐妹的配偶。
+   ⚠️ 用字面量判断而不是查表 —— normalizeDb 在脚本更早的位置就会调它，那会儿 const 还没初始化 ✗ */
+function kinIsInlaw(role){
+  return role === 'sisinlaw_o' || role === 'sisinlaw_y' || role === 'brolaw_o' || role === 'brolaw_y';
+}
 
 function kinLabel(role){ return role === 'head' ? '户主' : ((KIN_ROLES[role] && KIN_ROLES[role].label) || role || ''); }
 function kinInfo(role, headSex){
@@ -6725,13 +6748,18 @@ function kinInfo(role, headSex){
   if(sex === 'U') sex = (headSex === 'F' ? 'M' : 'F');      // 配偶：与户主相反
   return { gen:r.gen, sex, sp:!!r.sp, line:r.line || 'direct', role };
 }
-/* 两个人（各自相对户主的称谓）之间的关系名。headSex 只影响"公媳/婆媳"这类称呼 ✓ */
+/* 两个人（各自相对户主的称谓）之间的关系名。headSex 只影响"公媳/婆媳"这类称呼 ✓
+   ⚠️ 这里**只靠称谓推**，推不出"这两个人是不是一对"的时候（比如哥哥 vs 嫂子）会给出称谓本身。
+      真正的夫妻判定在 familyRows 里用 `kinSpousePairs()` 的结果覆盖，见那里的注释。 */
 function kinBetween(roleA, roleB, headSex){
   if(!roleA || !roleB) return '';
   if(roleA === roleB && roleA !== 'head'){
-    // 同一个称谓的两个人：兄弟/姐妹
+    // 同一个称谓的两个人：兄弟/姐妹；两个姻亲 → 妯娌/连襟
     const r = KIN_ROLES[roleA];
-    if(r && r.line === 'side') return r.sex === 'M' ? '兄弟' : '姐妹';
+    if(r && r.line === 'side'){
+      if(r.sp) return r.sex === 'F' ? '妯娌' : '连襟';
+      return r.sex === 'M' ? '兄弟' : '姐妹';
+    }
   }
   const A = kinInfo(roleA, headSex), B = kinInfo(roleB, headSex);
   const isCouple = KIN_COUPLES.some(([x,y])=>
@@ -6739,6 +6767,11 @@ function kinBetween(roleA, roleB, headSex){
   const d = A.gen - B.gen;                                   // A 比 B 晚几代
   if(d === 0){
     if(isCouple) return '夫妻';
+    // 姻亲：两个都是 → 妯娌（女）/连襟（男）；只有一个 → 直接叫那个称谓（嫂子/弟媳/姐夫/妹夫）
+    const aIn = A.line === 'side' && A.sp, bIn = B.line === 'side' && B.sp;
+    if(aIn && bIn) return A.sex === 'F' ? '妯娌' : '连襟';
+    if(aIn) return kinLabel(roleA);
+    if(bIn) return kinLabel(roleB);
     if(A.sex === 'M' && B.sex === 'M') return '兄弟';
     if(A.sex === 'F' && B.sex === 'F') return '姐妹';
     return '兄妹';
@@ -6747,6 +6780,8 @@ function kinBetween(roleA, roleB, headSex){
   const span = Math.abs(d);
   if(span === 1){
     if(up.line === 'side' || down.line === 'side'){
+      const side = up.line === 'side' ? up : down;
+      if(side.sp) return side.sex === 'F' ? '婶侄' : '姻亲';   // 嫂子/弟媳 → 婶侄；姐夫/妹夫 → 姻亲
       return up.sex === 'F' ? '姑侄' : '叔侄';                // 旁系差一辈
     }
     if(down.sp) return down.sex === 'F' ? (up.sex === 'M' ? '公媳' : '婆媳') : '翁婿';
@@ -6800,6 +6835,31 @@ function rowDisplayName(t, r){
   }
   return '';
 }
+/* ⭐ 谁是"一对夫妻"：返回 {人的key: 配偶的key}（key = `表id|行id`）。
+   数据里夫妻关系**只体现为称谓**，所以只能按称谓配：head↔spouse、father↔mother、
+   son↔dil、daughter↔sil、brother↔(嫂子/弟媳)、sister↔(姐夫/妹夫)。
+   同名多份时按数组顺序一一对上（录入顺序通常就是一对一对加的）。
+   ⚠️ 为什么需要它：光看称谓分不清"张大 vs 李四(嫂子)"是不是夫妻 ——
+      对张三（另一个兄弟）来说李四只是嫂子，对张大来说就是老婆 ✗ */
+function kinSpousePairs(fam){
+  const people = [{ t: fam.headT, r: fam.headR, role:'head', sp:(fam.headSp ? 1 : 0) }]
+    .concat(fam.members || []);
+  const key = x => x.t + '|' + x.r;
+  const map = {};
+  const byRole = {};
+  people.forEach(p=>{ if(!p || !p.role) return; (byRole[p.role] = byRole[p.role] || []).push(p); });
+  const zip = (as, bs)=>{
+    (as || []).forEach((a, i)=>{ const b = (bs || [])[i]; if(!b) return;
+      map[key(a)] = key(b); map[key(b)] = key(a); });
+  };
+  zip(byRole.head, byRole.spouse);
+  zip(byRole.father, byRole.mother);
+  zip(byRole.son, byRole.dil);
+  zip(byRole.daughter, byRole.sil);
+  zip(byRole.brother, (byRole.sisinlaw_o || []).concat(byRole.sisinlaw_y || []));
+  zip(byRole.sister,  (byRole.brolaw_o  || []).concat(byRole.brolaw_y  || []));
+  return map;
+}
 /* 这一户的全部成员（户主固定在最前，其余**按 members 数组的顺序**）。
    ⚠️ 顺序就是 `fam.members` 的数组顺序，不再按称谓现排 —— 面板里可以直接拖动改顺序，
       拖动后写回数组即可（导出/导入/normalizeDb 都是原样搬运数组，顺序天然保留）✓
@@ -6822,9 +6882,12 @@ function familyRows(fam, centerT, centerR){
   const cRow = out.find(o=>String(o.t) === String(cT) && String(o.r) === String(cR)) || out[0];
   if(!cRow) return out;
   const cRole = cRow.role;
+  const pairs = kinSpousePairs(fam);          // 真夫妻优先（称谓推不出"哥哥 vs 嫂子"这种）
+  const cKey = cRow.t + '|' + cRow.r;
   out.forEach(o=>{
+    const k = o.t + '|' + o.r;
     o.isCenter = (String(o.t) === String(cRow.t) && String(o.r) === String(cRow.r));
-    o.rel = o.isCenter ? '' : kinBetween(cRole, o.role, fam.headSex);
+    o.rel = o.isCenter ? '' : (pairs[cKey] === k ? '夫妻' : kinBetween(cRole, o.role, fam.headSex));
   });
   out.center = { t: cRow.t, r: cRow.r, role: cRole, nm: cRow.nm, no: cRow.no };
   return out;
@@ -6837,14 +6900,19 @@ function familyRows(fam, centerT, centerR){
       ② "嫁娶进来"这件事**跟户主是谁有关**：户主是王芳时，她丈夫张小明显示"配偶"（他相对她算外来的），
          但相对张小明的父亲，张小明才是本家血亲、王芳才是儿媳。
          所以 sp 一旦写进称谓就会被"换户主"翻转，来回换一次信息就丢了 ✗。
-      现在 sp 单独存在成员身上（`fam.members[].sp` / `fam.headSp`），换户主只改 role，不动 sp ✓ */
-function roleRelative(newHeadRole, oldRole, headSex, absSp){
+      现在 sp 单独存在成员身上（`fam.members[].sp` / `fam.headSp`），换户主只改 role，不动 sp ✓
+   isPartner：这位就是新户主的配偶（由 `kinSpousePairs()` 配出来的，不能只看称谓） */
+function roleRelative(newHeadRole, oldRole, headSex, absSp, isPartner){
+  if(isPartner) return 'spouse';
   const N = kinInfo(newHeadRole, headSex), O = kinInfo(oldRole, headSex);
   const d = O.gen - N.gen;                       // 这个人比新户主晚几代
-  const isHeadSpouse = kinPartnerRole(oldRole) === newHeadRole;   // 本来就是"新户主的配偶"
+  /* 旁系（兄弟/姐妹/嫂子/弟媳/姐夫/妹夫）跨代没有对应称谓（叔伯、姑妈、侄子…表里没有）
+     → **原样保留**，别硬套成"父亲/儿子"（那比留着更离谱，而且换回来也回不去）✗ */
+  if(O.line === 'side') return oldRole;
   if(d === 0){
-    if(isHeadSpouse) return 'spouse';
-    return O.sex === 'M' ? 'brother' : 'sister';  // 同辈非夫妻 → 兄弟姐妹（"嫂子"只能就近表示）
+    // 嫁娶进来、又不是新户主的配偶 → 兄弟的妻子 / 姐妹的丈夫
+    if(absSp) return O.sex === 'F' ? 'sisinlaw_y' : 'brolaw_y';
+    return O.sex === 'M' ? 'brother' : 'sister';
   }
   if(d === 1){
     if(absSp) return O.sex === 'F' ? 'dil' : 'sil';   // 嫁娶进来的 → 儿媳 / 女婿
@@ -6861,6 +6929,7 @@ function roleRelative(newHeadRole, oldRole, headSex, absSp){
 function famInsertByRank(fam, item){
   fam.members = fam.members || [];
   if(item.sp == null) item.sp = kinDefaultSp(item.role);
+  if(item.ir == null) item.ir = kinIsInlaw(item.role) ? item.role : '';
   const rank = role => { const i = KIN_ORDER.indexOf(role); return i < 0 ? 99 : i; };
   const r = rank(item.role);
   let at = fam.members.length;
@@ -7094,13 +7163,24 @@ function setFamilyHead(famId, tid, rid){
   const newRole = m.role;
   const spOf = x => (x.sp == null ? kinDefaultSp(x.role) : (x.sp ? 1 : 0));
   const newSp = spOf(m);
+  const pairs = kinSpousePairs(fam);                       // 换之前先算出"谁跟谁是一对"
+  const nk = tid + '|' + rid;
   const newSex = kinInfo(newRole, oldHeadSex).sex;          // 新户主的性别（由原称谓推出来）
-  const others = [ { t: fam.headT, r: fam.headR, role:'head', sp:(fam.headSp ? 1 : 0) } ]
+  const others = [ { t: fam.headT, r: fam.headR, role:'head', sp:(fam.headSp ? 1 : 0), ir:(fam.headIr || '') } ]
     .concat((fam.members||[]).filter(x=>!(String(x.t) === String(tid) && String(x.r) === String(rid))));
-  const rebuilt = others.map(x=>({ t: x.t, r: x.r,
-    role: roleRelative(newRole, x.role, oldHeadSex, spOf(x)),
-    sp: spOf(x) }));
+  /* ir = 这个人原来的"姻亲称谓"（嫂子/弟媳/姐夫/妹夫）。
+     她丈夫当户主时她得叫"配偶"，但**嫂子还是弟媳这个信息不能丢** ——
+     换回别的兄弟当户主时，靠它把「嫂子」还原回去（否则只会剩下默认的"弟媳"）✗ */
+  const rebuilt = others.map(x=>{
+    let role = roleRelative(newRole, x.role, oldHeadSex, spOf(x), pairs[x.t + '|' + x.r] === nk);
+    // ir 兜底：老数据（或测试里直接塞的）没有 ir 字段 → 从**他现在的称谓**取
+    const ir = x.ir || (kinIsInlaw(x.role) ? x.role : '');
+    if((role === 'sisinlaw_y' || role === 'brolaw_y') && ir) role = ir;
+    return { t: x.t, r: x.r, role, sp: spOf(x),
+             ir: kinIsInlaw(role) ? role : (role === 'spouse' ? ir : '') };
+  });
   fam.headT = tid; fam.headR = rid; fam.headSex = newSex; fam.headSp = newSp;
+  fam.headIr = kinIsInlaw(newRole) ? newRole : (m.ir || '');
   fam.members = rebuilt;
   save();
   refreshAfterFamilyEdit(fam.id, tid);
@@ -7173,8 +7253,9 @@ function createFamily(tid, rid){
   const role = roleEl ? roleEl.value : 'son';
   const picked = (window.__famNew && window.__famNew.picked) || [];
   window.__famNew = null;
-  const fam = { id: uid(), headT: tid, headR: rid, headSex: sex, headSp: 0,
-    members: picked.map(r=>({ t: tid, r: r, role: role, sp: kinDefaultSp(role) })) };
+  const fam = { id: uid(), headT: tid, headR: rid, headSex: sex, headSp: 0, headIr: '',
+    members: picked.map(r=>({ t: tid, r: r, role: role, sp: kinDefaultSp(role),
+                              ir: kinIsInlaw(role) ? role : '' })) };
   (db.families = db.families || []).push(fam);
   closeModal();
   save();
@@ -7318,7 +7399,7 @@ function setFamilyRole(famId, tid, rid, role){
   const m = (fam.members||[]).find(x=>String(x.t) === String(tid) && String(x.r) === String(rid));
   if(!m) return;
   // 只有真的改了称谓才重设"嫁娶进来"标记（点当前这一项 = 什么都不做，别把血亲误标成外来）
-  if(m.role !== role){ m.role = role; m.sp = kinDefaultSp(role); }
+  if(m.role !== role){ m.role = role; m.sp = kinDefaultSp(role); m.ir = kinIsInlaw(role) ? role : ''; }
   save();
   refreshAfterFamilyEdit(fam.id, tid);
   showFamily(fam.id);
@@ -12237,12 +12318,14 @@ function doImportSelected(){
     const members = (f.members||[]).map(m=>{
       const nt = idMap.get(String(m && m.t));
       const role = String((m && m.role) || '');
-      return nt ? { t: nt, r: String((m && m.r) || ''), role,
+      const ir = (m && kinIsInlaw(String(m.ir || ''))) ? String(m.ir) : (kinIsInlaw(role) ? role : '');
+      return nt ? { t: nt, r: String((m && m.r) || ''), role, ir,
                     sp: (m && m.sp != null) ? (m.sp ? 1 : 0) : kinDefaultSp(role) } : null;
     }).filter(m=>m && m.r && m.role);
     const nid = newGid(String(f.id));
     db.families.push({ id: nid, headT: hT, headR: String(f.headR || ''), headSex: f.headSex === 'F' ? 'F' : 'M',
-                       headSp: f.headSp ? 1 : 0, members });
+                       headSp: f.headSp ? 1 : 0,
+                       headIr: kinIsInlaw(String(f.headIr || '')) ? String(f.headIr) : '', members });
     famAdded++;
   });
   // 家庭编号也沿用（号被占用就让它重新分配，别出现两个"户1"）
