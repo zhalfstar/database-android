@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-25.3</title>
+<title>轻量数据库 · v2026-10-25.4</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -396,6 +396,13 @@ table.grid .g-num.fam{background:#fff1e0;color:#b35c00;right:auto;left:0;width:a
 #group-panel .gp-role b{color:#b35c00;font-weight:600}
 #group-panel .gp-head{font-weight:600;color:#b35c00}
 #group-panel .gp-center{background:rgba(255,241,224,.55);border-radius:6px}
+/* 家庭面板：成员行左边的小手柄（拖动排序）。
+   touch-action:none 必须写 —— 否则从手柄起手会被浏览器判成"滚面板"，拖动直接失效 ✗ */
+#group-panel .gp-grip{flex:0 0 15px;display:flex;align-items:center;justify-content:center;align-self:stretch;color:var(--muted);opacity:.65;font-size:13px;line-height:1;cursor:grab;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;touch-action:none;border-radius:5px}
+#group-panel .gp-grip:active{cursor:grabbing;opacity:1;background:var(--panel2)}
+#group-panel .gp-grip-lock{opacity:0;cursor:default;pointer-events:none}
+#group-panel .gp-item.gp-dragging{background:var(--panel2);border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.16);position:relative;z-index:2}
+#group-panel .gp-item.gp-dragging .gp-name{background:transparent}
 /* 「待加入清单」的行：序号+姓名 / 称谓下拉 / 移除 */
 .fam-stage-row{display:flex;align-items:center;gap:6px;padding:5px 2px;border-bottom:1px dashed var(--line)}
 .fam-stage-row:last-child{border-bottom:none}
@@ -1005,7 +1012,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-25.3">v2026-10-25.3</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-25.4">v2026-10-25.4</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -1506,14 +1513,18 @@ function normalizeDb(d){
      → 用户看到「新增成员后，原来那组的号变成新的号」（真机 2026-10-24）✗
      现在号一旦分配就写进这里，永不变。 */
   /* 家庭关系（血缘）：一"户"一个条目，members 里是**相对户主的称谓**。
-     role 必须是 KIN_ROLES 里认识的，否则丢掉（避免脏数据把推导搞乱） */
+     role 必须是 KIN_ROLES 里认识的，否则丢掉（避免脏数据把推导搞乱）。
+     ⚠️ `sp`（这个人是不是嫁娶进来的）必须一起收进来 —— 它是"人的属性"，换户主时靠它
+        才能把称谓算对；漏了就会被静默剥掉，来回换一次户主配偶就变成兄弟姐妹 ✗ */
   d.families = Array.isArray(d.families) ? d.families.filter(f=>f && f.headR).map(f=>({
     id: String(f.id || uid()),
     headT: String(f.headT || ''),
     headR: String(f.headR || ''),
     headSex: f.headSex === 'F' ? 'F' : 'M',
+    headSp: f.headSp ? 1 : 0,
     members: (Array.isArray(f.members) ? f.members : [])
-      .map(m=>({ t: String((m && m.t) || ''), r: String((m && m.r) || ''), role: String((m && m.role) || '') }))
+      .map(m=>({ t: String((m && m.t) || ''), r: String((m && m.r) || ''), role: String((m && m.role) || ''),
+                 sp: (m && m.sp != null) ? (m.sp ? 1 : 0) : kinDefaultSp(String((m && m.role) || '')) }))
       .filter(m=>m.t && m.r && m.role)
   })) : [];
   /* 家庭的固定编号（仿 gno）：户1、户2… 一旦分配就不变 */
@@ -5613,7 +5624,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>数字分组</b>：数字列中数值相同的记录会自动成组，点击组可查看成员、移除成员或解散整组——适合对账、查重</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>跨表关联</b>：长按某条记录 →「关联到其他记录」，可把不同表里的记录互相挂接、查看和解绑</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>家庭关系（血缘）</b>：点某条记录 →「<b>家庭关系</b>」→ 把它设为<b>户主</b>（选男/女），同一屏里选「他们与户主的关系」、勾上家人，一次就能建好一户（不勾人也可以，建好后会直接进"增加成员"）。<b>两人之间的关系会自动推出来</b>：户主与儿子是父子，再加儿媳就自动是<b>公媳</b>（户主为女时是婆媳）、再加孙子自动是<b>爷孙</b></p>'+
-    '<p style="margin:4px 0;font-size:13px">• <b>家庭关系怎么用</b>：① 行左上角橙色「<b>家1</b>」角标 = 这一户；<b>点谁的角标，就以谁为中心</b>看其他人和他的关系（点李四的角标就显示"张三与李四：夫妻、张小明与李四：母子…"）。② 面板里<b>点称谓</b>可以直接改成别的称谓，也能「设为本户户主」（换户主后成员称谓会按新户主自动重算）。③「增加成员」里选好称谓后<b>勾人就行</b>，勾中的会进"待加入清单"，可以换称谓再勾一批，最后点一次「全部加入」</p>'+
+    '<p style="margin:4px 0;font-size:13px">• <b>家庭关系怎么用</b>：① 行左上角橙色「<b>家1</b>」角标 = 这一户；<b>点谁的角标，就以谁为中心</b>看其他人和他的关系（点李四的角标就显示"张三与李四：夫妻、张小明与李四：母子…"）。② 面板里<b>点称谓</b>可以直接改成别的称谓，也能「设为本户户主」（换户主后成员称谓会按新户主自动重算）。③「增加成员」里选好称谓后<b>勾人就行</b>，勾中的会进"待加入清单"，可以换称谓再勾一批，最后点一次「全部加入」。④ 成员行左边有个<b>小把手（⠿）</b>，按住上下拖就能<b>调整成员顺序</b>（户主固定在最上面）；按住面板的<b>标题栏</b>可以把面板挪开，免得挡住要看的行</p>'+
     '<h3 style="margin:16px 0 8px">字段与表头</h3>'+
     '<p style="margin:4px 0;font-size:13px">• <b>单元格直接编辑（仅电脑版）</b>：<b>双击某一格</b>就能就地改这一格的内容 —— 回车（或点别处）保存，Esc 取消，Tab 保存并跳到右边一格。数字/日期/时间/是&#8203;否/选项等字段会自动换成对应的输入控件；「公式」字段由公式算出来，不能直接改；图片和签名请双击最左边的编号列打开记录再编辑</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>编辑整条记录</b>：双击最左边的<b>编号列</b>（手机上双击任意处）打开记录弹窗，可一次改多个字段、写语音、加关联</p>'+
@@ -5652,7 +5663,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-25.3</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-25.4</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -6698,6 +6709,13 @@ const KIN_ROLES = {
 const KIN_ORDER = ['spouse','son','daughter','dil','sil','grandson','granddaughter','father','mother','brother','sister','grandfather','grandmother'];
 /* 显式的"一对夫妻"组合（同代异性只有这几种才是夫妻，其余是兄妹/姐弟） */
 const KIN_COUPLES = [['head','spouse'],['father','mother'],['son','dil'],['daughter','sil']];
+/* 称谓 → 他/她的配偶称谓（夫妻配对的反查表） */
+const KIN_PARTNER = { head:'spouse', spouse:'head', father:'mother', mother:'father',
+                      son:'dil', dil:'son', daughter:'sil', sil:'daughter' };
+function kinPartnerRole(role){ return KIN_PARTNER[role] || null; }
+/* 这个称谓默认是不是"嫁娶进来的"（1=外来，0=本家血亲）。只在**加入那一刻**用来定初始值，
+   之后跟着人走、换户主时不再变 —— 见 roleRelative 里那段说明 */
+function kinDefaultSp(role){ return (role === 'spouse' || role === 'dil' || role === 'sil') ? 1 : 0; }
 
 function kinLabel(role){ return role === 'head' ? '户主' : ((KIN_ROLES[role] && KIN_ROLES[role].label) || role || ''); }
 function kinInfo(role, headSex){
@@ -6782,7 +6800,10 @@ function rowDisplayName(t, r){
   }
   return '';
 }
-/* 这一户的全部成员（户主在前，其余按称谓顺序）。
+/* 这一户的全部成员（户主固定在最前，其余**按 members 数组的顺序**）。
+   ⚠️ 顺序就是 `fam.members` 的数组顺序，不再按称谓现排 —— 面板里可以直接拖动改顺序，
+      拖动后写回数组即可（导出/导入/normalizeDb 都是原样搬运数组，顺序天然保留）✓
+   新加的人由 `famInsertByRank()` 按称谓插到"该在的位置"，所以默认看着还是整齐的。
    centerT/centerR：以谁为中心 —— 面板里显示"其他人与他/她"的关系（不传就是户主） */
 function familyRows(fam, centerT, centerR){
   if(!fam) return [];
@@ -6795,9 +6816,7 @@ function familyRows(fam, centerT, centerR){
                role: role, isHead: role === 'head' });
   };
   push(fam.headT, fam.headR, 'head');
-  const rank = role => { const i = KIN_ORDER.indexOf(role); return i < 0 ? 99 : i; };
-  (fam.members||[]).slice().sort((a,b)=>rank(a.role) - rank(b.role))
-    .forEach(m=>push(m.t, m.r, m.role));
+  (fam.members||[]).forEach(m=>push(m.t, m.r, m.role));
   // 中心人物（默认户主）—— 用它来算"其他人与他"的关系
   const cT = centerT || fam.headT, cR = centerR || fam.headR;
   const cRow = out.find(o=>String(o.t) === String(cT) && String(o.r) === String(cR)) || out[0];
@@ -6810,22 +6829,45 @@ function familyRows(fam, centerT, centerR){
   out.center = { t: cRow.t, r: cRow.r, role: cRole, nm: cRow.nm, no: cRow.no };
   return out;
 }
-/* 换户主时，把"某个人原来的称谓"换算成"他相对新户主该叫什么" */
-function roleRelative(newHeadRole, oldRole, headSex){
+/* 换户主时，把"某个人原来的称谓"换算成"他相对新户主该叫什么"。
+   absSp：这个人**是不是嫁娶进来的**（1/0）—— 必须从人身上取，不能从"他现在的称谓"推。
+   ⚠️ 为什么不能从称谓推（2026-10-25 真机：把儿子设为户主、再设回原户主，原户主的配偶变成"兄妹"）：
+      ① 夫妻关系在数据里只体现为称谓（head↔spouse、father↔mother、son↔dil、daughter↔sil），
+         老两口（father/mother）身上没有任何"我们是一对"的标记 → 只看称谓会把配偶算成姐妹；
+      ② "嫁娶进来"这件事**跟户主是谁有关**：户主是王芳时，她丈夫张小明显示"配偶"（他相对她算外来的），
+         但相对张小明的父亲，张小明才是本家血亲、王芳才是儿媳。
+         所以 sp 一旦写进称谓就会被"换户主"翻转，来回换一次信息就丢了 ✗。
+      现在 sp 单独存在成员身上（`fam.members[].sp` / `fam.headSp`），换户主只改 role，不动 sp ✓ */
+function roleRelative(newHeadRole, oldRole, headSex, absSp){
   const N = kinInfo(newHeadRole, headSex), O = kinInfo(oldRole, headSex);
   const d = O.gen - N.gen;                       // 这个人比新户主晚几代
+  const isHeadSpouse = kinPartnerRole(oldRole) === newHeadRole;   // 本来就是"新户主的配偶"
   if(d === 0){
-    if(O.sp) return 'spouse';
-    return O.sex === 'M' ? 'brother' : 'sister';
+    if(isHeadSpouse) return 'spouse';
+    return O.sex === 'M' ? 'brother' : 'sister';  // 同辈非夫妻 → 兄弟姐妹（"嫂子"只能就近表示）
   }
   if(d === 1){
-    if(O.sp) return O.sex === 'F' ? 'dil' : 'sil';
-    return O.sex === 'M' ? 'son' : 'daughter';
+    if(absSp) return O.sex === 'F' ? 'dil' : 'sil';   // 嫁娶进来的 → 儿媳 / 女婿
+    return O.sex === 'M' ? 'son' : 'daughter';        // 本家血亲 → 儿子 / 女儿
   }
   if(d === -1) return O.sex === 'M' ? 'father' : 'mother';
   if(d === 2) return O.sex === 'M' ? 'grandson' : 'granddaughter';
   if(d === -2) return O.sex === 'M' ? 'grandfather' : 'grandmother';
   return 'brother';
+}
+/* 新成员插进 members 的"该在的位置"（按称谓次序稳定插入）。
+   面板支持拖动排序后，顺序以数组为准 —— 新加的人不能一律甩到末尾（否则"孙子"会排到"儿媳"后面），
+   插到"最后一个比他靠前的人"之后即可；用户手动拖过的顺序也不会被整体打乱 ✓ */
+function famInsertByRank(fam, item){
+  fam.members = fam.members || [];
+  if(item.sp == null) item.sp = kinDefaultSp(item.role);
+  const rank = role => { const i = KIN_ORDER.indexOf(role); return i < 0 ? 99 : i; };
+  const r = rank(item.role);
+  let at = fam.members.length;
+  for(let i = 0; i < fam.members.length; i++){
+    if(rank(fam.members[i].role) > r){ at = i; break; }
+  }
+  fam.members.splice(at, 0, item);
 }
 /* 家庭里增删人之后：只重绘当前表（保留滚动位置），不跳走 */
 function refreshAfterFamilyEdit(famId, preferTid){
@@ -6862,7 +6904,13 @@ function showFamily(famId, ev, centerT, centerR){
     const del = (o.isHead || o.isCenter) ? ''
       : `<button type="button" class="gp-del" onclick="removeFamilyMember('${fam.id}','${o.t}','${o.r}',event)">移除</button>`;
     // 称谓可以**直接点开改**（不用先移出再加回来）
-    return `<div class="gp-item">
+    // 左边的小手柄 = 拖动排序（户主固定在最前，不给手柄，只留等宽占位保持对齐）
+    const key = o.t + '|' + o.r;
+    const grip = o.isHead
+      ? '<span class="gp-grip gp-grip-lock" aria-hidden="true"></span>'
+      : '<span class="gp-grip" title="按住上下拖动，调整成员顺序">⠿</span>';
+    return `<div class="gp-item" data-key="${esc(key)}"${o.isHead ? ' data-lock="1"' : ''}>
+      ${grip}
       <span class="gp-name${o.isHead ? ' gp-head' : ''}${o.isCenter ? ' gp-center' : ''}" onclick="jumpToRecord('${o.t}','${o.r}',event)" title="点击跳到这条记录">【${esc(o.tname)}】#${o.no != null ? o.no : ''}${o.nm ? (' ' + esc(o.nm)) : ''}<span class="gp-role" onclick="showKinRoleMenu(this,'${fam.id}','${o.t}','${o.r}',event)" title="点击修改称谓 / 设为户主">${esc(roleTxt)}${relTxt ? (' <b>' + esc(relTxt) + '</b>') : ''}</span></span>
       ${del}
     </div>`;
@@ -6892,7 +6940,94 @@ function showFamily(famId, ev, centerT, centerR){
   }
   panel.style.top = Math.max(8, top) + 'px';
   panel.style.left = Math.max(8, left) + 'px';
+  bindFamReorder(panel, fam.id);
+  bindFamPanelDrag(panel);
   _famPanelAt = Date.now();
+}
+/* ===== 家庭面板：成员拖动排序 + 面板拖动 ===== */
+/* 拖动排序：**只在左边的小手柄上起拖**。整行可拖会和"点名字跳记录 / 点称谓改称谓"打架 ✗
+   ⚠️ 手柄必须 `touch-action:none`，否则从手柄起手也会被浏览器判成"滚面板"、pointermove 被掐断。
+   拖动只是把 DOM 节点挪位置，松手时把顺序写回 `fam.members`（数组顺序 = 显示顺序）✓ */
+function bindFamReorder(panel, famId){
+  const fam = (db.families||[]).find(f=>String(f.id) === String(famId));
+  if(!fam) return;
+  const movable = ()=>Array.from(panel.querySelectorAll('.gp-item')).filter(x=>!x.dataset.lock);
+  panel.addEventListener('pointerdown', e=>{
+    const grip = e.target.closest('.gp-grip');
+    if(!grip || grip.classList.contains('gp-grip-lock')) return;
+    const item = grip.closest('.gp-item');
+    if(!item) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const btns = panel.querySelector('.gp-btns');
+    const startX = e.clientX, startY = e.clientY;
+    let moved = false;
+    item.classList.add('gp-dragging');
+    const move = ev=>{
+      if(!moved && Math.abs(ev.clientY - startY) + Math.abs(ev.clientX - startX) < 4) return;
+      moved = true;
+      // 指针停在谁的"上半边"就插到谁前面；都不满足就落到最后一个（按钮区之前）
+      const rest = movable().filter(x=>x !== item);
+      const before = rest.find(x=>{
+        const r = x.getBoundingClientRect();
+        return ev.clientY < r.top + r.height / 2;
+      });
+      if(before){ if(item.nextElementSibling !== before) panel.insertBefore(item, before); }
+      else if(btns && item.nextElementSibling !== btns){ panel.insertBefore(item, btns); }
+    };
+    const up = ()=>{
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      item.classList.remove('gp-dragging');
+      if(!moved) return;
+      const map = {};
+      (fam.members||[]).forEach(m=>{ map[m.t + '|' + m.r] = m; });
+      const next = movable().map(x=>map[x.dataset.key]).filter(Boolean);
+      // 兜底：万一有条目没对上（记录刚好被删掉之类），剩下的原样补回去，别丢人
+      (fam.members||[]).forEach(m=>{ if(next.indexOf(m) < 0) next.push(m); });
+      fam.members = next;
+      save();
+      toast('成员顺序已保存');
+    };
+    window.addEventListener('pointermove', move, { passive:false });
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  });
+}
+/* 面板本身也能拖（按住标题栏）：手机上面板常常正好盖住要看的行 */
+function bindFamPanelDrag(panel){
+  const title = panel.querySelector('.gp-title');
+  if(!title) return;
+  title.style.cursor = 'move';
+  title.style.touchAction = 'none';
+  title.addEventListener('pointerdown', e=>{
+    if(e.target.closest('button')) return;
+    e.preventDefault();
+    const sx = e.clientX, sy = e.clientY;
+    const r = panel.getBoundingClientRect();
+    const ox = r.left, oy = r.top;
+    let raf = 0, dx = 0, dy = 0;
+    const apply = ()=>{
+      raf = 0;
+      const w = panel.offsetWidth, h = panel.offsetHeight;
+      panel.style.left = Math.max(4, Math.min(window.innerWidth  - w - 4, ox + dx)) + 'px';
+      panel.style.top  = Math.max(4, Math.min(window.innerHeight - h - 4, oy + dy)) + 'px';
+    };
+    const move = ev=>{
+      dx = ev.clientX - sx; dy = ev.clientY - sy;
+      if(!raf) raf = requestAnimationFrame(apply);   // 每帧最多写一次 left/top
+    };
+    const up = ()=>{
+      if(raf){ cancelAnimationFrame(raf); apply(); }
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+    window.addEventListener('pointercancel', up);
+  });
 }
 /* 点称谓 → 小菜单：改称谓 / 设为户主 / 改户主性别（不用移出再加回来） */
 function showKinRoleMenu(anchorEl, famId, tid, rid, ev){
@@ -6949,18 +7084,23 @@ function setFamilyHeadSex(famId, sex){
   showFamily(fam.id);
   toast('户主性别已改为「' + (fam.headSex === 'F' ? '女' : '男') + '」');
 }
-/* 换户主：所有成员的称谓都要按新户主重算（否则"儿子"会变成"陌生人"） */
+/* 换户主：所有成员的称谓都要按新户主重算（否则"儿子"会变成"陌生人"）。
+   ⚠️ 只重算 role，**不动 sp**（谁嫁娶进来是人的属性，不随户主变）—— 见 roleRelative 的说明 */
 function setFamilyHead(famId, tid, rid){
   const fam = (db.families||[]).find(f=>String(f.id) === String(famId)); if(!fam) return;
   const m = (fam.members||[]).find(x=>String(x.t) === String(tid) && String(x.r) === String(rid));
   if(!m){ toast('这个人不在这户里'); return; }
   const oldHeadSex = fam.headSex;
   const newRole = m.role;
+  const spOf = x => (x.sp == null ? kinDefaultSp(x.role) : (x.sp ? 1 : 0));
+  const newSp = spOf(m);
   const newSex = kinInfo(newRole, oldHeadSex).sex;          // 新户主的性别（由原称谓推出来）
-  const others = [ { t: fam.headT, r: fam.headR, role:'head' } ]
+  const others = [ { t: fam.headT, r: fam.headR, role:'head', sp:(fam.headSp ? 1 : 0) } ]
     .concat((fam.members||[]).filter(x=>!(String(x.t) === String(tid) && String(x.r) === String(rid))));
-  const rebuilt = others.map(x=>({ t: x.t, r: x.r, role: roleRelative(newRole, x.role, oldHeadSex) }));
-  fam.headT = tid; fam.headR = rid; fam.headSex = newSex;
+  const rebuilt = others.map(x=>({ t: x.t, r: x.r,
+    role: roleRelative(newRole, x.role, oldHeadSex, spOf(x)),
+    sp: spOf(x) }));
+  fam.headT = tid; fam.headR = rid; fam.headSex = newSex; fam.headSp = newSp;
   fam.members = rebuilt;
   save();
   refreshAfterFamilyEdit(fam.id, tid);
@@ -7033,8 +7173,8 @@ function createFamily(tid, rid){
   const role = roleEl ? roleEl.value : 'son';
   const picked = (window.__famNew && window.__famNew.picked) || [];
   window.__famNew = null;
-  const fam = { id: uid(), headT: tid, headR: rid, headSex: sex,
-    members: picked.map(r=>({ t: tid, r: r, role: role })) };
+  const fam = { id: uid(), headT: tid, headR: rid, headSex: sex, headSp: 0,
+    members: picked.map(r=>({ t: tid, r: r, role: role, sp: kinDefaultSp(role) })) };
   (db.families = db.families || []).push(fam);
   closeModal();
   save();
@@ -7162,8 +7302,7 @@ function doAddFamilyMember(){
   let n = 0;
   st.staged.forEach(x=>{
     if((fam.members||[]).some(m=>String(m.t) === String(x.t) && String(m.r) === String(x.r))) return;
-    fam.members = fam.members || [];
-    fam.members.push({ t: x.t, r: x.r, role: x.role });
+    famInsertByRank(fam, { t: x.t, r: x.r, role: x.role });
     n++;
   });
   const tid = st.tid;
@@ -7178,7 +7317,8 @@ function setFamilyRole(famId, tid, rid, role){
   const fam = (db.families||[]).find(f=>String(f.id) === String(famId)); if(!fam) return;
   const m = (fam.members||[]).find(x=>String(x.t) === String(tid) && String(x.r) === String(rid));
   if(!m) return;
-  m.role = role;
+  // 只有真的改了称谓才重设"嫁娶进来"标记（点当前这一项 = 什么都不做，别把血亲误标成外来）
+  if(m.role !== role){ m.role = role; m.sp = kinDefaultSp(role); }
   save();
   refreshAfterFamilyEdit(fam.id, tid);
   showFamily(fam.id);
@@ -12096,10 +12236,13 @@ function doImportSelected(){
     if(!hT) return;
     const members = (f.members||[]).map(m=>{
       const nt = idMap.get(String(m && m.t));
-      return nt ? { t: nt, r: String((m && m.r) || ''), role: String((m && m.role) || '') } : null;
+      const role = String((m && m.role) || '');
+      return nt ? { t: nt, r: String((m && m.r) || ''), role,
+                    sp: (m && m.sp != null) ? (m.sp ? 1 : 0) : kinDefaultSp(role) } : null;
     }).filter(m=>m && m.r && m.role);
     const nid = newGid(String(f.id));
-    db.families.push({ id: nid, headT: hT, headR: String(f.headR || ''), headSex: f.headSex === 'F' ? 'F' : 'M', members });
+    db.families.push({ id: nid, headT: hT, headR: String(f.headR || ''), headSex: f.headSex === 'F' ? 'F' : 'M',
+                       headSp: f.headSp ? 1 : 0, members });
     famAdded++;
   });
   // 家庭编号也沿用（号被占用就让它重新分配，别出现两个"户1"）
