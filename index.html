@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-27.3</title>
+<title>轻量数据库 · v2026-10-27.4</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -433,6 +433,7 @@ table.grid .g-num.fam{background:#fff1e0;color:#b35c00;right:auto;left:0;width:a
 .kin-menu .kin-row:hover{background:var(--panel2)}
 .kin-menu .kin-tick{color:#b35c00;font-weight:700}
 .kin-menu .kin-head{margin:0 0 2px;border-bottom:1px solid var(--line);border-radius:6px 6px 0 0;padding:9px 8px;color:#b35c00;font-weight:600}
+.kin-menu .kin-born{color:var(--muted);font-size:12px;padding:6px 8px}
 /* 「增加成员」里的称谓下拉按钮（长得像个 select） */
 .kin-pick-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;cursor:pointer}
 .kin-pick-btn .kin-caret{transform:rotate(90deg)}   /* 下拉按钮上的三角朝下 */
@@ -1033,7 +1034,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-27.3">v2026-10-27.3</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-27.4">v2026-10-27.4</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -1546,13 +1547,16 @@ function normalizeDb(d){
     headSex: f.headSex === 'F' ? 'F' : 'M',
     headSp: f.headSp ? 1 : 0,
     headIr: kinIsInlaw(String(f.headIr || '')) ? String(f.headIr) : '',
+    /* 出生年：填了才能分长幼（哥哥/弟弟、堂兄/堂弟、伯父/叔叔）。0 = 没填 */
+    headBorn: Number(f.headBorn) > 0 ? Math.floor(Number(f.headBorn)) : 0,
     members: (Array.isArray(f.members) ? f.members : [])
       .map(m=>{
         const role = String((m && m.role) || '');
         return { t: String((m && m.t) || ''), r: String((m && m.r) || ''), role,
                  sp: (m && m.sp != null) ? (m.sp ? 1 : 0) : kinDefaultSp(role),
                  ir: (m && kinIsInlaw(String(m.ir || ''))) ? String(m.ir)
-                     : (kinIsInlaw(role) ? role : '') };
+                     : (kinIsInlaw(role) ? role : ''),
+                 born: Number(m && m.born) > 0 ? Math.floor(Number(m.born)) : 0 };
       })
       .filter(m=>m.t && m.r && m.role)
   })) : [];
@@ -5660,7 +5664,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>数字分组</b>：数字列中数值相同的记录会自动成组，点击组可查看成员、移除成员或解散整组——适合对账、查重</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>跨表关联</b>：长按某条记录 →「关联到其他记录」，可把不同表里的记录互相挂接、查看和解绑</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>家庭关系（血缘）</b>：点某条记录 →「<b>家庭关系</b>」→ 把它设为<b>户主</b>（选男/女），同一屏里选「他们与户主的关系」、勾上家人，一次就能建好一户（不勾人也可以，建好后会直接进"增加成员"）。<b>两人之间的关系会自动推出来</b>：户主与儿子是父子，再加儿媳就自动是<b>公媳</b>（户主为女时是婆媳）、再加孙子自动是<b>爷孙</b>；兄弟姐妹的配偶也有专门称谓 —— <b>嫂子、弟媳、姐夫、妹夫</b>（两个媳妇之间显示<b>妯娌</b>，两个女婿之间显示<b>连襟</b>）；旁系长辈/晚辈也有 —— <b>叔伯、婶婶、姑妈</b>（父亲这边）、<b>舅舅、舅妈、姨妈</b>（母亲这边）、<b>侄子、侄女</b>（兄弟的子女）、<b>外甥、外甥女</b>（姐妹的子女）、<b>堂/表兄弟妹</b>，<b>把儿子设成户主</b>时，原来的兄弟会自动变成他的<b>叔伯</b>（户主为女时是舅舅）、侄子会变成<b>堂兄弟</b>（户主为女时是表兄弟）。称谓菜单按「配偶/晚辈/长辈/同辈」分组，<b>点组名可以收起/展开</b>，「设为本户户主」在最上面</p>'+
-    '<p style="margin:4px 0;font-size:13px">• <b>家庭关系怎么用</b>：① 行左上角橙色「<b>家1</b>」角标 = 这一户；<b>点谁的角标，就以谁为中心</b>看其他人和他的关系（点李四的角标就显示"张三与李四：夫妻、张小明与李四：母子…"）。② 面板里<b>点称谓</b>可以直接改成别的称谓，也能「设为本户户主」（换户主后成员称谓会按新户主自动重算）。③「增加成员」里<b>点「儿子」那一栏选称谓</b>（配偶一项直接列出，晚辈/长辈/同辈点组名收起展开），选好后<b>勾人就行</b>，勾中的会进"待加入清单"，可以换称谓再勾一批，最后点一次「全部加入」。④ 成员行左边有个<b>小把手（⠿）</b>，按住上下拖就能<b>调整成员顺序</b>（户主固定在最上面）；按住面板或「称谓/户主」小菜单的<b>标题栏</b>都能把它挪开，免得挡住要看的行。⑤ 想知道<b>任意两个人</b>是什么关系：点面板里的「<b>查关系</b>」→ 选两个人（<b>同一户</b>或<b>两户</b>都行），下面直接显示「张三 与 李四：夫妻」。<b>跨户</b>的话第一次要先说一句"两家的户主是什么关系"（比如兄弟），建好之后两户任何人都能互查（户1的儿子 vs 户2的女儿 → 堂兄妹）。关系名用的是正经称谓：兄弟的孙子是<b>侄孙</b>（姐妹的孙子是外甥孙），不是笼统的"爷孙"</p>'+
+    '<p style="margin:4px 0;font-size:13px">• <b>家庭关系怎么用</b>：① 行左上角橙色「<b>家1</b>」角标 = 这一户；<b>点谁的角标，就以谁为中心</b>看其他人和他的关系（点李四的角标就显示"张三与李四：夫妻、张小明与李四：母子…"）。② 面板里<b>点称谓</b>可以直接改成别的称谓，也能「设为本户户主」（换户主后成员称谓会按新户主自动重算）。③「增加成员」里<b>点「儿子」那一栏选称谓</b>（配偶一项直接列出，晚辈/长辈/同辈点组名收起展开），选好后<b>勾人就行</b>，勾中的会进"待加入清单"，可以换称谓再勾一批，最后点一次「全部加入」。④ 成员行左边有个<b>小把手（⠿）</b>，按住上下拖就能<b>调整成员顺序</b>（户主固定在最上面）；按住面板或「称谓/户主」小菜单的<b>标题栏</b>都能把它挪开，免得挡住要看的行。⑤ 想知道<b>任意两个人</b>是什么关系：点面板里的「<b>查关系</b>」→ 选两个人（<b>同一户</b>或<b>两户</b>都行），下面直接显示「张三 与 李四：夫妻」。<b>跨户</b>的话第一次要先说一句"两家的户主是什么关系"（比如兄弟），建好之后两户任何人都能互查（户1的儿子 vs 户2的女儿 → 堂兄妹）。关系名用的是正经称谓：兄弟的孙子是<b>侄孙</b>（姐妹的孙子是外甥孙），不是笼统的"爷孙"。⑥ 想分<b>长幼</b>：点称谓 →「<b>出生年</b>」填一下，兄弟就会显示成<b>哥哥/弟弟</b>、堂兄弟变<b>堂兄/堂弟</b>、父亲的兄弟分出<b>伯父/叔叔</b>（父亲的兄弟要父亲也在这一户里才比得出来）</p>'+
     '<h3 style="margin:16px 0 8px">字段与表头</h3>'+
     '<p style="margin:4px 0;font-size:13px">• <b>单元格直接编辑（仅电脑版）</b>：<b>双击某一格</b>就能就地改这一格的内容 —— 回车（或点别处）保存，Esc 取消，Tab 保存并跳到右边一格。数字/日期/时间/是&#8203;否/选项等字段会自动换成对应的输入控件；「公式」字段由公式算出来，不能直接改；图片和签名请双击最左边的编号列打开记录再编辑</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>编辑整条记录</b>：双击最左边的<b>编号列</b>（手机上双击任意处）打开记录弹窗，可一次改多个字段、写语音、加关联</p>'+
@@ -5699,7 +5703,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-27.3</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-27.4</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -6807,6 +6811,32 @@ function kinIsCousin(role){
 }
 
 function kinLabel(role){ return role === 'head' ? '户主' : ((KIN_ROLES[role] && KIN_ROLES[role].label) || role || ''); }
+/* 称谓的**显示名**：填了出生年就能分出长幼 ——
+   兄弟 → 哥哥/弟弟，姐妹 → 姐姐/妹妹，堂兄弟 → 堂兄/堂弟，表姐妹 → 表姐/表妹；
+   叔伯 → 伯父/叔叔（要父亲也在这一户、且填了出生年，才比得出来）。
+   ⚠️ 只影响**显示**，存下来的 role 不变（"兄弟"还是 brother），所以换户主/导出都不受影响 */
+function kinLabelOf(fam, role, born){
+  if(role === 'head') return '户主';
+  const base = kinLabel(role);
+  const b = Number(born) || 0;
+  if(!b) return base;
+  const hb = Number(fam && fam.headBorn) || 0;
+  if(role === 'uncle_p'){
+    const fa = ((fam && fam.members) || []).find(x=>x.role === 'father');
+    const fb = fa ? (Number(fa.born) || 0) : 0;
+    if(!fb) return base;
+    return b < fb ? '伯父' : '叔叔';      // 出生年小 = 年纪大
+  }
+  if(!hb) return base;
+  const elder = b < hb;
+  if(role === 'brother') return elder ? '哥哥' : '弟弟';
+  if(role === 'sister')  return elder ? '姐姐' : '妹妹';
+  if(role === 'tang_m')  return elder ? '堂兄' : '堂弟';
+  if(role === 'tang_f')  return elder ? '堂姐' : '堂妹';
+  if(role === 'biao_m')  return elder ? '表兄' : '表弟';
+  if(role === 'biao_f')  return elder ? '表姐' : '表妹';
+  return base;
+}
 function kinInfo(role, headSex){
   if(role === 'head') return { gen:0, sex:(headSex === 'F' ? 'F' : 'M'), sp:false, line:'direct', role:'head' };
   const r = KIN_ROLES[role] || { gen:0, sex:'U', sp:false, line:'direct' };
@@ -7055,15 +7085,16 @@ function kinSpousePairs(fam){
 function familyRows(fam, centerT, centerR){
   if(!fam) return [];
   const out = [];
-  const push = (tid, rid, role)=>{
+  const push = (tid, rid, role, born)=>{
     const t = db.tables.find(x=>x.id === tid);
     const r = t && t.rows.find(x=>x.id === rid);
     if(!t || !r) return;
     out.push({ t: tid, r: rid, no: r.no, nm: rowDisplayName(t, r), tname: t.name,
-               role: role, isHead: role === 'head' });
+               role: role, isHead: role === 'head', born: Number(born) || 0,
+               label: kinLabelOf(fam, role, born) });
   };
-  push(fam.headT, fam.headR, 'head');
-  (fam.members||[]).forEach(m=>push(m.t, m.r, m.role));
+  push(fam.headT, fam.headR, 'head', fam.headBorn);
+  (fam.members||[]).forEach(m=>push(m.t, m.r, m.role, m.born));
   // 中心人物（默认户主）—— 用它来算"其他人与他"的关系
   const cT = centerT || fam.headT, cR = centerR || fam.headR;
   const cRow = out.find(o=>String(o.t) === String(cT) && String(o.r) === String(cR)) || out[0];
@@ -7187,10 +7218,10 @@ function showFamily(famId, ev, centerT, centerR){
   const rows = familyRows(fam, centerT, centerR);
   const c = rows.center || { t: fam.headT, r: fam.headR, role:'head' };
   const no = familyNoMap()[fam.id] || '?';
-  const cLabel = c.role === 'head' ? '户主' : kinLabel(c.role);
+  const cLabel = c.role === 'head' ? '户主' : ((rows.find(o=>o.isCenter) || {}).label || kinLabel(c.role));
   const cName = (rows.find(o=>o.isCenter) || {}).nm || '';
   const items = rows.map(o=>{
-    const roleTxt = o.isHead ? ('户主 · ' + (fam.headSex === 'F' ? '女' : '男')) : kinLabel(o.role);
+    const roleTxt = o.isHead ? ('户主 · ' + (fam.headSex === 'F' ? '女' : '男')) : (o.label || kinLabel(o.role));
     const relTxt = o.rel ? ('与' + (c.role === 'head' ? '户主' : (cName || '他')) + '：' + o.rel) : '';
     const del = (o.isHead || o.isCenter) ? ''
       : `<button type="button" class="gp-del" onclick="removeFamilyMember('${fam.id}','${o.t}','${o.r}',event)">移除</button>`;
@@ -7406,10 +7437,18 @@ function relPeopleOf(famId){
     const t = db.tables.find(x=>String(x.id) === String(tid));
     const r = t && t.rows.find(x=>String(x.id) === String(rid));
     if(!t || !r) return;
-    out.push({ famId: fam.id, t: tid, r: rid, role, nm: rowDisplayName(t, r), no: r.no });
+    out.push({ famId: fam.id, t: tid, r: rid, role, nm: rowDisplayName(t, r), no: r.no,
+               born: 0, label: kinLabel(role) });
   };
   push(fam.headT, fam.headR, 'head');
   (fam.members||[]).forEach(m=>push(m.t, m.r, m.role));
+  // 带上出生年 + 显示名（哥哥/弟弟…）
+  out.forEach(p=>{
+    const isHead = String(p.t) === String(fam.headT) && String(p.r) === String(fam.headR);
+    const src = isHead ? { born: fam.headBorn } : ((fam.members||[]).find(x=>String(x.t) === String(p.t) && String(x.r) === String(p.r)) || {});
+    p.born = Number(src.born) || 0;
+    p.label = kinLabelOf(fam, p.role, p.born);
+  });
   return out;
 }
 function famPersonOf(famId, tid, rid){
@@ -7519,7 +7558,7 @@ function relFillPeople(which){
   if(!fsel || !psel) return;
   const ppl = relPeopleOf(fsel.value);
   psel.innerHTML = ppl.length ? ppl.map(p=>{
-    const roleTxt = p.role === 'head' ? '户主' : kinLabel(p.role);
+    const roleTxt = p.role === 'head' ? '户主' : (p.label || kinLabel(p.role));
     return `<option value="${p.t}|${p.r}">#${p.no != null ? p.no : ''} ${esc(p.nm || '')} · ${esc(roleTxt)}</option>`;
   }).join('') : '<option value="">（这户还没有可选的人）</option>';
   relQueryRun();
@@ -7590,12 +7629,17 @@ function showKinRoleMenu(anchorEl, famId, tid, rid, ev){
   title.className = 'kin-title';
   title.textContent = isHead ? '户主设置（按住标题栏可拖动）' : '称谓 / 户主（按住标题栏可拖动）';
   menu.appendChild(title);
+  /* 出生年：填了才分得出长幼（哥哥/弟弟、堂兄/堂弟、伯父/叔叔） */
+  const bornVal = isHead ? (fam.headBorn || 0) : ((m && m.born) || 0);
+  const bornRow = ()=>kinRowEl('出生年：' + (bornVal || '未填'), false, ()=>{ close(); openBornEdit(fam.id, tid, rid); }, 'kin-born');
   if(isHead){
+    menu.appendChild(bornRow());
     menu.appendChild(kinRowEl('户主性别：男', fam.headSex !== 'F', ()=>{ close(); setFamilyHeadSex(fam.id, 'M'); }));
     menu.appendChild(kinRowEl('户主性别：女', fam.headSex === 'F', ()=>{ close(); setFamilyHeadSex(fam.id, 'F'); }));
   } else {
     /* 「设为本户户主」放**最前面** —— 最常用的操作，不用翻到底部去找 */
     menu.appendChild(kinRowEl('设为本户户主', false, ()=>{ close(); setFamilyHead(fam.id, tid, rid); }, 'kin-head'));
+    menu.appendChild(bornRow());
     kinBuildGroups(menu, cur, kinOpenGroup(cur), (k)=>{ close(); setFamilyRole(fam.id, tid, rid, k); });
   }
   document.body.appendChild(menu);
@@ -7609,6 +7653,46 @@ function showKinRoleMenu(anchorEl, famId, tid, rid, ev){
     menu.remove();
   };
   setTimeout(()=>document.addEventListener('click', closeOnDoc), 0);
+}
+/* 出生年（可选）：填了才能分长幼 —— 只影响显示名，不动存下来的称谓 */
+function openBornEdit(famId, tid, rid){
+  const fam = (db.families||[]).find(f=>String(f.id) === String(famId));
+  if(!fam) return;
+  const isHead = String(tid) === String(fam.headT) && String(rid) === String(fam.headR);
+  const m = isHead ? null : (fam.members||[]).find(x=>String(x.t) === String(tid) && String(x.r) === String(rid));
+  const cur = isHead ? (fam.headBorn || '') : ((m && m.born) || '');
+  window.__bornEdit = { famId: fam.id, tid, rid, isHead };
+  openModal(`<div class="modal small">
+    <div class="modal-head"><h2>出生年</h2><button type="button" class="icon-btn" onclick="closeModal()">${svg('i-x')}</button></div>
+    <div class="modal-body">
+      <div class="muted" style="font-size:12px;line-height:1.7;margin-bottom:10px">填了出生年，同辈之间就能自动分出<b>哥哥/弟弟、姐姐/妹妹、堂兄/堂弟</b>；父亲的兄弟也能分出<b>伯父/叔叔</b>（需要父亲也在这一户里）。<br>不填也能用，只是只显示"兄弟/叔伯"这类统称。</div>
+      <input class="in" id="born-in" type="number" inputmode="numeric" placeholder="例如 1950" value="${cur}">
+      <div class="muted" style="font-size:12px;margin-top:8px">留空 = 清掉</div>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn ghost eq" onclick="closeModal()">取消</button>
+      <button type="button" class="btn primary eq" onclick="saveBorn()">保存</button>
+    </div>
+  </div>`);
+  setTimeout(()=>{ const el = document.getElementById('born-in'); if(el){ try{ el.focus(); }catch(e){} } }, 60);
+}
+function saveBorn(){
+  const st = window.__bornEdit; if(!st) return;
+  const v = ((document.getElementById('born-in') || {}).value || '').trim();
+  const n = parseInt(v, 10);
+  const born = Number.isFinite(n) && n > 1000 && n < 3000 ? n : 0;
+  const fam = (db.families||[]).find(f=>String(f.id) === String(st.famId));
+  if(!fam){ window.__bornEdit = null; closeModal(); return; }
+  if(st.isHead) fam.headBorn = born;
+  else {
+    const m = (fam.members||[]).find(x=>String(x.t) === String(st.tid) && String(x.r) === String(st.rid));
+    if(m) m.born = born;
+  }
+  window.__bornEdit = null;
+  closeModal();
+  save();
+  showFamily(fam.id);
+  toast(born ? ('出生年已存为 ' + born) : '已清掉出生年');
 }
 function setFamilyHeadSex(famId, sex){
   const fam = (db.families||[]).find(f=>String(f.id) === String(famId)); if(!fam) return;
@@ -7631,7 +7715,8 @@ function setFamilyHead(famId, tid, rid){
   const pairs = kinSpousePairs(fam);                       // 换之前先算出"谁跟谁是一对"
   const nk = tid + '|' + rid;
   const newSex = kinInfo(newRole, oldHeadSex).sex;          // 新户主的性别（由原称谓推出来）
-  const others = [ { t: fam.headT, r: fam.headR, role:'head', sp:(fam.headSp ? 1 : 0), ir:(fam.headIr || '') } ]
+  const others = [ { t: fam.headT, r: fam.headR, role:'head', sp:(fam.headSp ? 1 : 0), ir:(fam.headIr || ''),
+                     born:(fam.headBorn || 0) } ]
     .concat((fam.members||[]).filter(x=>!(String(x.t) === String(tid) && String(x.r) === String(rid))));
   /* ir = 这个人原来的"姻亲称谓"（嫂子/弟媳/姐夫/妹夫）。
      她丈夫当户主时她得叫"配偶"，但**嫂子还是弟媳这个信息不能丢** ——
@@ -7642,10 +7727,12 @@ function setFamilyHead(famId, tid, rid){
     const ir = x.ir || (kinIsInlaw(x.role) ? x.role : '');
     if((role === 'sisinlaw_y' || role === 'brolaw_y') && ir) role = ir;
     return { t: x.t, r: x.r, role, sp: spOf(x),
+             born: Number(x.born) > 0 ? Math.floor(Number(x.born)) : 0,   // 出生年跟着人走
              ir: kinIsInlaw(role) ? role : (role === 'spouse' ? ir : '') };
   });
   fam.headT = tid; fam.headR = rid; fam.headSex = newSex; fam.headSp = newSp;
   fam.headIr = kinIsInlaw(newRole) ? newRole : (m.ir || '');
+  fam.headBorn = Number(m.born) > 0 ? Math.floor(Number(m.born)) : 0;
   fam.members = rebuilt;
   save();
   refreshAfterFamilyEdit(fam.id, tid);
@@ -12454,7 +12541,7 @@ function exportPayloadByTables(list){
     if(ids.has(String(f.headT))) return true;
     return (f.members||[]).some(m=>ids.has(String(m.t)));
   }).map(f=>({ id:f.id, headT:f.headT, headR:f.headR, headSex:f.headSex,
-    headSp: f.headSp ? 1 : 0, headIr: f.headIr || '',
+    headSp: f.headSp ? 1 : 0, headIr: f.headIr || '', headBorn: f.headBorn || 0,
     members:(f.members||[]).filter(m=>ids.has(String(m.t)) || String(m.t)===String(f.headT)) }));
   const fno = {};
   const famIds = new Set(fams.map(f=>String(f.id)));
@@ -12837,12 +12924,14 @@ function doImportSelected(){
       const role = String((m && m.role) || '');
       const ir = (m && kinIsInlaw(String(m.ir || ''))) ? String(m.ir) : (kinIsInlaw(role) ? role : '');
       return nt ? { t: nt, r: String((m && m.r) || ''), role, ir,
+                    born: Number(m && m.born) > 0 ? Math.floor(Number(m.born)) : 0,
                     sp: (m && m.sp != null) ? (m.sp ? 1 : 0) : kinDefaultSp(role) } : null;
     }).filter(m=>m && m.r && m.role);
     const nid = newGid(String(f.id));
     db.families.push({ id: nid, headT: hT, headR: String(f.headR || ''), headSex: f.headSex === 'F' ? 'F' : 'M',
                        headSp: f.headSp ? 1 : 0,
-                       headIr: kinIsInlaw(String(f.headIr || '')) ? String(f.headIr) : '', members });
+                       headIr: kinIsInlaw(String(f.headIr || '')) ? String(f.headIr) : '',
+                       headBorn: Number(f.headBorn) > 0 ? Math.floor(Number(f.headBorn)) : 0, members });
     famAdded++;
   });
   /* 户与户之间的关系：两端都导进来了才保留（否则就是个悬空链接） */
