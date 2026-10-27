@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-25.9</title>
+<title>轻量数据库 · v2026-10-27.1</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -403,6 +403,14 @@ table.grid .g-num.fam{background:#fff1e0;color:#b35c00;right:auto;left:0;width:a
 #group-panel .gp-grip-lock{opacity:0;cursor:default;pointer-events:none}
 #group-panel .gp-item.gp-dragging{background:var(--panel2);border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,.16);position:relative;z-index:2}
 #group-panel .gp-item.gp-dragging .gp-name{background:transparent}
+/* 查关系：点两个人 → 结果显示在这一行 */
+#group-panel .gp-relrow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+#group-panel .gp-relbtn{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;white-space:nowrap}
+#group-panel .gp-relbtn:hover{background:var(--panel2)}
+#group-panel .gp-relres{font-size:12px;color:#b35c00;font-weight:600;line-height:1.4}
+#group-panel.rel-mode .gp-name{cursor:crosshair}
+#group-panel .gp-item.rel-a{background:rgba(66,133,244,.14);border-radius:6px}
+#group-panel .gp-item.rel-b{background:rgba(179,92,0,.14);border-radius:6px}
 /* 「待加入清单」的行：序号+姓名 / 称谓下拉 / 移除 */
 .fam-stage-row{display:flex;align-items:center;gap:6px;padding:5px 2px;border-bottom:1px dashed var(--line)}
 .fam-stage-row:last-child{border-bottom:none}
@@ -1023,7 +1031,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-25.9">v2026-10-25.9</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-27.1">v2026-10-27.1</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -5644,7 +5652,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>数字分组</b>：数字列中数值相同的记录会自动成组，点击组可查看成员、移除成员或解散整组——适合对账、查重</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>跨表关联</b>：长按某条记录 →「关联到其他记录」，可把不同表里的记录互相挂接、查看和解绑</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>家庭关系（血缘）</b>：点某条记录 →「<b>家庭关系</b>」→ 把它设为<b>户主</b>（选男/女），同一屏里选「他们与户主的关系」、勾上家人，一次就能建好一户（不勾人也可以，建好后会直接进"增加成员"）。<b>两人之间的关系会自动推出来</b>：户主与儿子是父子，再加儿媳就自动是<b>公媳</b>（户主为女时是婆媳）、再加孙子自动是<b>爷孙</b>；兄弟姐妹的配偶也有专门称谓 —— <b>嫂子、弟媳、姐夫、妹夫</b>（两个媳妇之间显示<b>妯娌</b>，两个女婿之间显示<b>连襟</b>）；旁系长辈/晚辈也有 —— <b>叔伯、婶婶、姑妈</b>（父亲这边）、<b>舅舅、舅妈、姨妈</b>（母亲这边）、<b>侄子、侄女</b>（兄弟的子女）、<b>外甥、外甥女</b>（姐妹的子女）、<b>堂/表兄弟妹</b>，<b>把儿子设成户主</b>时，原来的兄弟会自动变成他的<b>叔伯</b>（户主为女时是舅舅）、侄子会变成<b>堂兄弟</b>（户主为女时是表兄弟）。称谓菜单按「配偶/晚辈/长辈/同辈」分组，<b>点组名可以收起/展开</b>，「设为本户户主」在最上面</p>'+
-    '<p style="margin:4px 0;font-size:13px">• <b>家庭关系怎么用</b>：① 行左上角橙色「<b>家1</b>」角标 = 这一户；<b>点谁的角标，就以谁为中心</b>看其他人和他的关系（点李四的角标就显示"张三与李四：夫妻、张小明与李四：母子…"）。② 面板里<b>点称谓</b>可以直接改成别的称谓，也能「设为本户户主」（换户主后成员称谓会按新户主自动重算）。③「增加成员」里<b>点「儿子」那一栏选称谓</b>（配偶一项直接列出，晚辈/长辈/同辈点组名收起展开），选好后<b>勾人就行</b>，勾中的会进"待加入清单"，可以换称谓再勾一批，最后点一次「全部加入」。④ 成员行左边有个<b>小把手（⠿）</b>，按住上下拖就能<b>调整成员顺序</b>（户主固定在最上面）；按住面板或「称谓/户主」小菜单的<b>标题栏</b>都能把它挪开，免得挡住要看的行</p>'+
+    '<p style="margin:4px 0;font-size:13px">• <b>家庭关系怎么用</b>：① 行左上角橙色「<b>家1</b>」角标 = 这一户；<b>点谁的角标，就以谁为中心</b>看其他人和他的关系（点李四的角标就显示"张三与李四：夫妻、张小明与李四：母子…"）。② 面板里<b>点称谓</b>可以直接改成别的称谓，也能「设为本户户主」（换户主后成员称谓会按新户主自动重算）。③「增加成员」里<b>点「儿子」那一栏选称谓</b>（配偶一项直接列出，晚辈/长辈/同辈点组名收起展开），选好后<b>勾人就行</b>，勾中的会进"待加入清单"，可以换称谓再勾一批，最后点一次「全部加入」。④ 成员行左边有个<b>小把手（⠿）</b>，按住上下拖就能<b>调整成员顺序</b>（户主固定在最上面）；按住面板或「称谓/户主」小菜单的<b>标题栏</b>都能把它挪开，免得挡住要看的行。⑤ 想知道<b>任意两个人</b>是什么关系：点面板里的「<b>查关系</b>」→ 依次点这两个人，面板上直接显示「张三 与 李四：夫妻」（都是靠各人对户主的称谓推出来的）</p>'+
     '<h3 style="margin:16px 0 8px">字段与表头</h3>'+
     '<p style="margin:4px 0;font-size:13px">• <b>单元格直接编辑（仅电脑版）</b>：<b>双击某一格</b>就能就地改这一格的内容 —— 回车（或点别处）保存，Esc 取消，Tab 保存并跳到右边一格。数字/日期/时间/是&#8203;否/选项等字段会自动换成对应的输入控件；「公式」字段由公式算出来，不能直接改；图片和签名请双击最左边的编号列打开记录再编辑</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>编辑整条记录</b>：双击最左边的<b>编号列</b>（手机上双击任意处）打开记录弹窗，可一次改多个字段、写语音、加关联</p>'+
@@ -5683,7 +5691,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-25.9</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-27.1</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -6704,7 +6712,7 @@ function jumpToRecord(tid, rid, ev){
   };
   setTimeout(()=>{ if(!flash()) setTimeout(flash, 350); }, 130);
 }
-function closeGroupPanel(){ const p = document.getElementById('group-panel'); if(p) p.remove(); }
+function closeGroupPanel(){ _famRel = null; const p = document.getElementById('group-panel'); if(p) p.remove(); }
 
 /* ===== 家庭关系（血缘）=====
    交互与「关联记录」相仿：行上一个小角标（家1）→ 点开面板看全户成员。
@@ -7071,6 +7079,8 @@ function refreshAfterFamilyEdit(famId, preferTid){
 let _famPanelAt = 0;
 /* 称谓菜单里手动展开的是哪一组（null = 没选过 → 默认展开"当前称谓所在的组"） */
 let _kinOpenSec = null;
+/* 查关系：正在选人时 {famId, a}（a = 已选的第一个人）；null = 不在选人 */
+let _famRel = null;
 function showFamily(famId, ev, centerT, centerR){
   if(ev){ ev.stopPropagation && ev.stopPropagation(); ev.preventDefault && ev.preventDefault(); }
   const fam = (db.families||[]).find(f=>String(f.id) === String(famId));
@@ -7094,7 +7104,7 @@ function showFamily(famId, ev, centerT, centerR){
       : '<span class="gp-grip" title="按住上下拖动，调整成员顺序">⠿</span>';
     return `<div class="gp-item" data-key="${esc(key)}"${o.isHead ? ' data-lock="1"' : ''}>
       ${grip}
-      <span class="gp-name${o.isHead ? ' gp-head' : ''}${o.isCenter ? ' gp-center' : ''}" onclick="jumpToRecord('${o.t}','${o.r}',event)" title="点击跳到这条记录">【${esc(o.tname)}】#${o.no != null ? o.no : ''}${o.nm ? (' ' + esc(o.nm)) : ''}<span class="gp-role" onclick="showKinRoleMenu(this,'${fam.id}','${o.t}','${o.r}',event)" title="点击修改称谓 / 设为户主">${esc(roleTxt)}${relTxt ? (' <b>' + esc(relTxt) + '</b>') : ''}</span></span>
+      <span class="gp-name${o.isHead ? ' gp-head' : ''}${o.isCenter ? ' gp-center' : ''}" onclick="famRowTap('${o.t}','${o.r}',event)" title="点击跳到这条记录（查关系时用来选人）">【${esc(o.tname)}】#${o.no != null ? o.no : ''}${o.nm ? (' ' + esc(o.nm)) : ''}<span class="gp-role" onclick="showKinRoleMenu(this,'${fam.id}','${o.t}','${o.r}',event)" title="点击修改称谓 / 设为户主">${esc(roleTxt)}${relTxt ? (' <b>' + esc(relTxt) + '</b>') : ''}</span></span>
       ${del}
     </div>`;
   }).join('');
@@ -7104,6 +7114,10 @@ function showFamily(famId, ev, centerT, centerR){
   panel.innerHTML = `
     <div class="gp-title">户${no} · 共 ${rows.length} 人${c.role === 'head' ? '' : (' · 以「' + esc(cName || cLabel) + '」为中心')}</div>
     ${items}
+    <div class="gp-relrow">
+      <button type="button" class="gp-relbtn" onclick="startFamilyRelPick('${fam.id}',event)">查关系</button>
+      <span class="gp-relres" id="gp-relres"></span>
+    </div>
     <div class="gp-btns">
       <button type="button" class="gp-addlink" onclick="openAddFamilyMember('${fam.id}')">增加成员</button>
       <button type="button" class="gp-dissolve" onclick="dissolveFamily('${fam.id}',event)">解散</button>
@@ -7273,8 +7287,69 @@ function kinOpenGroup(cur){
   if(_kinOpenSec !== null) return _kinOpenSec;
   return ((KIN_GROUPS.find(g=>g.roles.indexOf(cur) >= 0) || {}).t) || '';
 }
+/* ===== 查关系：借助"每个人都相对户主有称谓"，任意两人之间的关系都能推出来 =====
+   面板里点「查关系」→ 点第一个人 → 点第二个人 → 结果直接显示在面板上（如「张三 与 李四：夫妻」） */
+function kinRelBetween(fam, a, b){
+  const pairs = kinSpousePairs(fam);        // 真夫妻优先（称谓分不出"哥哥 vs 嫂子"）
+  if(pairs[a.t + '|' + a.r] === (b.t + '|' + b.r)) return '夫妻';
+  return kinBetween(a.role, b.role, fam.headSex);
+}
+function famRowTap(tid, rid, ev){
+  if(_famRel){ famPickForRel(tid, rid, ev); return; }
+  jumpToRecord(tid, rid, ev);
+}
+function setRelHint(panel, hint){
+  const t = panel.querySelector('.gp-title'); if(!t) return;
+  if(!t.dataset.base) t.dataset.base = t.textContent;
+  t.textContent = hint ? ('查关系 · ' + hint) : t.dataset.base;
+}
+function startFamilyRelPick(famId, ev){
+  if(ev){ ev.stopPropagation && ev.stopPropagation(); ev.preventDefault && ev.preventDefault(); }
+  const panel = document.getElementById('group-panel');
+  if(!panel) return;
+  const btn = panel.querySelector('.gp-relbtn');
+  if(_famRel){                                  // 再点一次 = 取消
+    _famRel = null;
+    panel.classList.remove('rel-mode');
+    panel.querySelectorAll('.rel-a,.rel-b').forEach(x=>x.classList.remove('rel-a','rel-b'));
+    if(btn) btn.textContent = '查关系';
+    setRelHint(panel, '');
+    return;
+  }
+  _famRel = { famId: famId, a: null };
+  panel.classList.add('rel-mode');
+  if(btn) btn.textContent = '取消';
+  setRelHint(panel, '先点第一个人');
+}
+function famPickForRel(tid, rid, ev){
+  if(ev && ev.stopPropagation) ev.stopPropagation();
+  const panel = document.getElementById('group-panel');
+  if(!_famRel || !panel) return;
+  const fam = (db.families||[]).find(f=>String(f.id) === String(_famRel.famId));
+  if(!fam) return;
+  const rows = familyRows(fam);
+  const a = rows.find(o=>String(o.t) === String(tid) && String(o.r) === String(rid));
+  if(!a) return;
+  const item = Array.from(panel.querySelectorAll('.gp-item')).find(el=>el.dataset.key === (tid + '|' + rid));
+  if(!_famRel.a){
+    _famRel.a = a;
+    if(item) item.classList.add('rel-a');
+    setRelHint(panel, '再点第二个人');
+    return;
+  }
+  if(String(_famRel.a.t) === String(tid) && String(_famRel.a.r) === String(rid)){ toast('要选两个不同的人'); return; }
+  const rel = kinRelBetween(fam, _famRel.a, a);
+  const res = panel.querySelector('#gp-relres');
+  if(res) res.innerHTML = '<b>' + esc(_famRel.a.nm || '这个人') + '</b> 与 <b>' + esc(a.nm || '这个人') + '</b>：' + esc(rel || '亲戚');
+  if(item) item.classList.add('rel-b');
+  _famRel = null;
+  panel.classList.remove('rel-mode');
+  const btn = panel.querySelector('.gp-relbtn'); if(btn) btn.textContent = '查关系';
+  setRelHint(panel, '');
+}
 /* 点称谓 → 小菜单：改称谓 / 设为户主 / 改户主性别（不用移出再加回来） */
 function showKinRoleMenu(anchorEl, famId, tid, rid, ev){
+  if(_famRel) return;                      // 正在"查关系"选人 → 别弹改称谓
   if(ev){ ev.stopPropagation && ev.stopPropagation(); ev.preventDefault && ev.preventDefault(); }
   const fam = (db.families||[]).find(f=>String(f.id) === String(famId));
   if(!fam) return;
@@ -7493,7 +7568,15 @@ function openRolePick(btnId, inputId, labelId, ev){
   menu.className = 'kin-menu';
   kinBuildGroups(menu, cur, kinOpenGroup(cur), (k)=>pickRoleTo(inputId, labelId, k));
   document.body.appendChild(menu);
-  menu.style.minWidth = Math.max(160, Math.round(btn.getBoundingClientRect().width)) + 'px';
+  /* 宽度**跟按钮一样宽**（按钮在弹窗里是 100%），窗口变窄/转屏时跟着变 ——
+     以前只给了个 min-width，页面上看着就是"一块窄条"，和输入框对不齐 ✗ */
+  const fitWidth = ()=>{
+    const w = Math.min(Math.round(btn.getBoundingClientRect().width), window.innerWidth - 16);
+    menu.style.width = Math.max(120, w) + 'px';
+    menu.style.minWidth = '0';
+    menu.style.maxWidth = 'calc(100vw - 16px)';
+  };
+  fitWidth();
   placePopup(menu, btn);
   const closeOnDoc = (e)=>{
     if(!document.body.contains(menu)){ document.removeEventListener('click', closeOnDoc); return; }
@@ -7501,6 +7584,11 @@ function openRolePick(btnId, inputId, labelId, ev){
     if(menu.contains(e.target) || btn.contains(e.target)) return;
     menu.remove();
   };
+  const onResize = ()=>{
+    if(!document.body.contains(menu)){ window.removeEventListener('resize', onResize); return; }
+    fitWidth(); placePopup(menu, btn);
+  };
+  window.addEventListener('resize', onResize);
   setTimeout(()=>document.addEventListener('click', closeOnDoc), 0);
 }
 function pickRoleTo(inputId, labelId, k){
