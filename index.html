@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-27.2</title>
+<title>轻量数据库 · v2026-10-27.3</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1033,7 +1033,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-27.2">v2026-10-27.2</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-27.3">v2026-10-27.3</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -5660,7 +5660,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>数字分组</b>：数字列中数值相同的记录会自动成组，点击组可查看成员、移除成员或解散整组——适合对账、查重</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>跨表关联</b>：长按某条记录 →「关联到其他记录」，可把不同表里的记录互相挂接、查看和解绑</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>家庭关系（血缘）</b>：点某条记录 →「<b>家庭关系</b>」→ 把它设为<b>户主</b>（选男/女），同一屏里选「他们与户主的关系」、勾上家人，一次就能建好一户（不勾人也可以，建好后会直接进"增加成员"）。<b>两人之间的关系会自动推出来</b>：户主与儿子是父子，再加儿媳就自动是<b>公媳</b>（户主为女时是婆媳）、再加孙子自动是<b>爷孙</b>；兄弟姐妹的配偶也有专门称谓 —— <b>嫂子、弟媳、姐夫、妹夫</b>（两个媳妇之间显示<b>妯娌</b>，两个女婿之间显示<b>连襟</b>）；旁系长辈/晚辈也有 —— <b>叔伯、婶婶、姑妈</b>（父亲这边）、<b>舅舅、舅妈、姨妈</b>（母亲这边）、<b>侄子、侄女</b>（兄弟的子女）、<b>外甥、外甥女</b>（姐妹的子女）、<b>堂/表兄弟妹</b>，<b>把儿子设成户主</b>时，原来的兄弟会自动变成他的<b>叔伯</b>（户主为女时是舅舅）、侄子会变成<b>堂兄弟</b>（户主为女时是表兄弟）。称谓菜单按「配偶/晚辈/长辈/同辈」分组，<b>点组名可以收起/展开</b>，「设为本户户主」在最上面</p>'+
-    '<p style="margin:4px 0;font-size:13px">• <b>家庭关系怎么用</b>：① 行左上角橙色「<b>家1</b>」角标 = 这一户；<b>点谁的角标，就以谁为中心</b>看其他人和他的关系（点李四的角标就显示"张三与李四：夫妻、张小明与李四：母子…"）。② 面板里<b>点称谓</b>可以直接改成别的称谓，也能「设为本户户主」（换户主后成员称谓会按新户主自动重算）。③「增加成员」里<b>点「儿子」那一栏选称谓</b>（配偶一项直接列出，晚辈/长辈/同辈点组名收起展开），选好后<b>勾人就行</b>，勾中的会进"待加入清单"，可以换称谓再勾一批，最后点一次「全部加入」。④ 成员行左边有个<b>小把手（⠿）</b>，按住上下拖就能<b>调整成员顺序</b>（户主固定在最上面）；按住面板或「称谓/户主」小菜单的<b>标题栏</b>都能把它挪开，免得挡住要看的行。⑤ 想知道<b>任意两个人</b>是什么关系：点面板里的「<b>查关系</b>」→ 选两个人（<b>同一户</b>或<b>两户</b>都行），下面直接显示「张三 与 李四：夫妻」。<b>跨户</b>的话第一次要先说一句"两家的户主是什么关系"（比如兄弟），建好之后两户任何人都能互查（户1的儿子 vs 户2的女儿 → 堂兄妹）</p>'+
+    '<p style="margin:4px 0;font-size:13px">• <b>家庭关系怎么用</b>：① 行左上角橙色「<b>家1</b>」角标 = 这一户；<b>点谁的角标，就以谁为中心</b>看其他人和他的关系（点李四的角标就显示"张三与李四：夫妻、张小明与李四：母子…"）。② 面板里<b>点称谓</b>可以直接改成别的称谓，也能「设为本户户主」（换户主后成员称谓会按新户主自动重算）。③「增加成员」里<b>点「儿子」那一栏选称谓</b>（配偶一项直接列出，晚辈/长辈/同辈点组名收起展开），选好后<b>勾人就行</b>，勾中的会进"待加入清单"，可以换称谓再勾一批，最后点一次「全部加入」。④ 成员行左边有个<b>小把手（⠿）</b>，按住上下拖就能<b>调整成员顺序</b>（户主固定在最上面）；按住面板或「称谓/户主」小菜单的<b>标题栏</b>都能把它挪开，免得挡住要看的行。⑤ 想知道<b>任意两个人</b>是什么关系：点面板里的「<b>查关系</b>」→ 选两个人（<b>同一户</b>或<b>两户</b>都行），下面直接显示「张三 与 李四：夫妻」。<b>跨户</b>的话第一次要先说一句"两家的户主是什么关系"（比如兄弟），建好之后两户任何人都能互查（户1的儿子 vs 户2的女儿 → 堂兄妹）。关系名用的是正经称谓：兄弟的孙子是<b>侄孙</b>（姐妹的孙子是外甥孙），不是笼统的"爷孙"</p>'+
     '<h3 style="margin:16px 0 8px">字段与表头</h3>'+
     '<p style="margin:4px 0;font-size:13px">• <b>单元格直接编辑（仅电脑版）</b>：<b>双击某一格</b>就能就地改这一格的内容 —— 回车（或点别处）保存，Esc 取消，Tab 保存并跳到右边一格。数字/日期/时间/是&#8203;否/选项等字段会自动换成对应的输入控件；「公式」字段由公式算出来，不能直接改；图片和签名请双击最左边的编号列打开记录再编辑</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>编辑整条记录</b>：双击最左边的<b>编号列</b>（手机上双击任意处）打开记录弹窗，可一次改多个字段、写语音、加关联</p>'+
@@ -5699,7 +5699,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-27.2</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-27.3</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -6814,6 +6814,27 @@ function kinInfo(role, headSex){
   if(sex === 'U') sex = (headSex === 'F' ? 'M' : 'F');      // 配偶：与户主相反
   return { gen:r.gen, sex, sp:!!r.sp, line:r.line || 'direct', role };
 }
+/* 母系那边的称谓（舅舅/姨妈/舅妈/外甥/外甥女/表亲）—— 判断"是不是同一个父系血脉"用 */
+function kinIsMatSide(role){
+  return role === 'uncle_mat' || role === 'aunt_mat' || role === 'auntlaw_mat' ||
+         role === 'neph_s' || role === 'niece_s' || role === 'biao_m' || role === 'biao_f';
+}
+/* 这个人**不是**"某个父系长辈的直系后代"（表亲、堂亲另算一条支线） */
+function kinNotDescendant(role){ return kinIsMatSide(role) || kinIsCousin(role); }
+/* 直系差 span 辈的一对一称呼（upSex 长辈性别 / downSex 晚辈性别 / downSp 晚辈是嫁娶进来的） */
+function kinDirectPair(span, upSex, downSex, downSp){
+  if(span === 1){
+    if(downSp) return downSex === 'F' ? (upSex === 'M' ? '公媳' : '婆媳') : '翁婿';
+    if(downSex === 'M') return upSex === 'M' ? '父子' : '母子';
+    return upSex === 'M' ? '父女' : '母女';
+  }
+  if(span === 2){
+    if(downSp) return downSex === 'F' ? '孙媳' : '孙女婿';
+    return '爷孙';
+  }
+  if(span === 3) return '曾祖孙';
+  return '远亲';
+}
 /* 两个人（各自相对户主的称谓）之间的关系名。headSex 只影响"公媳/婆媳"这类称呼 ✓
    ⚠️ 这里**只靠称谓推**，推不出"这两个人是不是一对"的时候（比如哥哥 vs 嫂子）会给出称谓本身。
       真正的夫妻判定在 familyRows 里用 `kinSpousePairs()` 的结果覆盖，见那里的注释。 */
@@ -6823,6 +6844,9 @@ function kinBetween(roleA, roleB, headSex){
     // 同一个称谓的两个人：兄弟/姐妹；两个姻亲 → 妯娌/连襟；两个堂表亲 → 称谓本身
     const r = KIN_ROLES[roleA];
     if(r && kinIsCousin(roleA)) return r.label;
+    // 两个侄子 = 堂兄弟；两个外甥 = 表兄弟（同一个叔伯/舅舅的孙辈，各自父亲是兄弟/姐妹）
+    if(roleA === 'nephew' || roleA === 'niece') return r.sex === 'M' ? '堂兄弟' : '堂姐妹';
+    if(roleA === 'neph_s' || roleA === 'niece_s') return r.sex === 'M' ? '表兄弟' : '表姐妹';
     if(r && r.line === 'side'){
       if(r.sp) return r.sex === 'F' ? '妯娌' : '连襟';
       return r.sex === 'M' ? '兄弟' : '姐妹';
@@ -6856,17 +6880,41 @@ function kinBetween(roleA, roleB, headSex){
       if(A.sex === 'F' && B.sex === 'F') return base + '姐妹';
       return base + '兄妹';
     }
-    const aIn = A.line === 'side' && A.sp, bIn = B.line === 'side' && B.sp;
-    if(aIn && bIn) return A.sex === 'F' ? '妯娌' : '连襟';
+    // 户主的配偶 vs 户主的兄弟姐妹 → 叔嫂（对方男）/ 姑嫂（对方女）
+    const spA = (roleA === 'spouse'), spB = (roleB === 'spouse');
+    if(spA || spB){
+      const other = spA ? B : A;
+      const otherRole = spA ? roleB : roleA;
+      if(otherRole === 'brother') return '叔嫂';
+      if(otherRole === 'sister') return '姑嫂';
+    }
+    const aIn = (roleA === 'spouse' || A.line === 'side') && A.sp;
+    const bIn = (roleB === 'spouse' || B.line === 'side') && B.sp;
+    if(aIn && bIn){
+      if(A.sex === 'F' && B.sex === 'F') return '妯娌';    // 两个媳妇
+      if(A.sex === 'M' && B.sex === 'M') return '连襟';    // 两个女婿
+      return '姻亲';
+    }
     if(aIn) return kinLabel(roleA);
     if(bIn) return kinLabel(roleB);
     if(A.sex === 'M' && B.sex === 'M') return '兄弟';
     if(A.sex === 'F' && B.sex === 'F') return '姐妹';
     return '兄妹';
   }
+  /* 一方是直系长辈、另一方在同一条父系血脉上 → 其实还是直系关系：
+     祖父 vs 兄弟 = 爷孙（兄弟也是祖父的孙子，不是"侄孙"✗）
+     祖父 vs 叔伯 = 父子（叔伯就是祖父的儿子） */
+  if(A.line === 'direct' && A.gen < 0 && B.gen > A.gen && !kinNotDescendant(roleB))
+    return kinDirectPair(B.gen - A.gen, A.sex, B.sex, B.sp);
+  if(B.line === 'direct' && B.gen < 0 && A.gen > B.gen && !kinNotDescendant(roleA))
+    return kinDirectPair(A.gen - B.gen, B.sex, A.sex, A.sp);
+
   const down = d > 0 ? A : B, up = d > 0 ? B : A;             // down 是晚辈
   const span = Math.abs(d);
   if(span === 1){
+    // 晚辈是"姐妹的孩子"（外甥/外甥女）→ 舅甥 / 姨甥（不论长辈那一端是不是旁系）
+    const dRole = d > 0 ? roleA : roleB;
+    if(dRole === 'neph_s' || dRole === 'niece_s') return up.sex === 'M' ? '舅甥' : '姨甥';
     if(up.line === 'side' || down.line === 'side'){
       const side = up.line === 'side' ? up : down;
       const other = up.line === 'side' ? down : up;
@@ -6885,13 +6933,48 @@ function kinBetween(roleA, roleB, headSex){
     return up.sex === 'M' ? '父女' : '母女';
   }
   if(span === 2){
-    // 叔伯 vs 侄子 这种（两边都隔着一层旁系）→ 还是叔侄，不是爷孙
     const s2 = up.line === 'side' ? up : (down.line === 'side' ? down : null);
-    const lab2 = s2 && KIN_UNCLE_LABEL[s2.role];
-    if(lab2) return lab2;
+    if(s2){
+      /* ⚠️ 旁系隔两辈**不是爷孙** ✗（真机 2026-10-27：「兄弟的孙子，也是爷孙关系吗？」）
+         兄弟的孙子 = **侄孙**（女的是侄孙女）；姐妹的孙子 = **外甥孙**。
+         这条支线是兄弟还是姐妹，看户主性别（跟"堂还是表"同一条规则） */
+      const base = (headSex === 'F') ? '外甥' : '侄';
+      return base + (down.sex === 'F' ? '孙女' : '孙');
+    }
     return '爷孙';
   }
-  return '亲戚';
+  if(span === 3){
+    if(up.line === 'side' || down.line === 'side') return (headSex === 'F' ? '外甥' : '侄') + (down.sex === 'F' ? '孙女' : '孙');
+    return '曾祖孙';
+  }
+  return '远亲';
+}
+/* 反过来的称谓：已知"户主b 相对户主a 是 R"，求"户主a 相对户主b 是什么"。
+   refSex = 户主a 的性别（也就是要算称谓的那个人的性别）。
+   ⚠️ 不能拿 roleRelative 硬套：堂/表/兄弟这些**旁系是对称的**，套一遍会被算成"兄弟"✗
+      （真机 2026-10-27：「户主与户主之间是堂兄弟，查关系变成了兄弟」） */
+function kinInvertRole(role, refSex){
+  const M = refSex !== 'F';
+  switch(role){
+    case 'spouse': return 'spouse';
+    case 'father': case 'mother':       return M ? 'son' : 'daughter';
+    case 'son': case 'daughter':        return M ? 'father' : 'mother';
+    case 'grandfather': case 'grandmother': return M ? 'grandson' : 'granddaughter';
+    case 'grandson': case 'granddaughter':  return M ? 'grandfather' : 'grandmother';
+    case 'brother': case 'sister':
+    case 'sisinlaw_o': case 'sisinlaw_y': case 'brolaw_o': case 'brolaw_y':
+      return M ? 'brother' : 'sister';
+    case 'tang_m': case 'tang_f': return M ? 'tang_m' : 'tang_f';
+    case 'biao_m': case 'biao_f': return M ? 'biao_m' : 'biao_f';
+    case 'uncle_p': case 'auntlaw_p':   return M ? 'nephew' : 'niece';
+    case 'aunt_p':                      return M ? 'nephew' : 'niece';
+    case 'uncle_mat': case 'auntlaw_mat': return M ? 'neph_s' : 'niece_s';
+    case 'aunt_mat':                    return M ? 'neph_s' : 'niece_s';
+    case 'nephew': case 'niece':        return M ? 'uncle_p' : 'aunt_p';
+    case 'neph_s': case 'niece_s':      return M ? 'uncle_mat' : 'aunt_mat';
+    case 'dil': case 'sil':             return M ? 'father' : 'mother';
+    default: return role;
+  }
 }
 /* 家庭的固定编号（户1、户2…），一旦分配就不变 —— 和组别号同样的道理 */
 function familyNoMap(){
@@ -7355,8 +7438,8 @@ function famHeadRoleFrom(famAId, famBId){
         if(String(l.a) === cur.id){ to = String(l.b); r = l.role; }
         else if(String(l.b) === cur.id){
           to = String(l.a);
-          const fa = famOf(cur.id);
-          r = roleRelative(l.role, 'head', fa ? fa.headSex : 'M');   // 反过来：户主a 相对户主b
+          const ft = famOf(to);
+          r = kinInvertRole(l.role, ft ? ft.headSex : 'M');   // 反过来：户主a 相对户主b
         }
         if(!to || to === cur.id || seen[to] !== undefined) continue;
         let composed = r;
