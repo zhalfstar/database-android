@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-10-27.4</title>
+<title>轻量数据库 · v2026-11-26.1</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1034,7 +1034,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-10-27.4">v2026-10-27.4</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-11-26.1">v2026-11-26.1</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -3065,7 +3065,10 @@ function shareMany(items, title){
     toast('已开始下载 ' + list.length + ' 个文件');
   };
   if(files.length && navigator.canShare && navigator.share && navigator.canShare({files})){
-    navigator.share({files, title: title}).then(()=>{
+    /* ⚠️ iOS Safari 会把 title 当成**独立的文本载荷**一起分享 → 点「存储到文件」
+       会多出一个 .txt（内容就是标题文字），和真实文件一起落两份（真机 2026-11-26）。
+       分享文件时只传 files，文件名已在 File.name 里，title 纯属多余且有害 ✗ */
+    navigator.share({files}).then(()=>{
       toast('已分享 ' + files.length + ' 个文件');
     }).catch(err=>{
       if(err && err.name === 'AbortError'){ toast('已取消导出'); return; }
@@ -5703,7 +5706,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-10-27.4</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-11-26.1</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -12440,7 +12443,9 @@ function exportFile(blob, fname, opts){
   let file = null;
   try{ file = new File([blob], fname, {type: blob.type || 'application/octet-stream'}); }catch(e){}
   if(file && navigator.canShare && navigator.share && navigator.canShare({files:[file]})){
-    navigator.share({files:[file], title: title}).then(()=>{
+    /* ⚠️ 不传 title —— iOS 会把它当独立文本载荷，多存出一个 .txt（真机 2026-11-26）。
+       文件名已经在 File.name 里，title 多余且有害 ✗ */
+    navigator.share({files:[file]}).then(()=>{
       toast(okMsg);
     }).catch(err=>{
       if(err && err.name === 'AbortError'){ toast('已取消导出'); return; }   // 用户自己取消，别报成功
