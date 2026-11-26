@@ -13034,12 +13034,57 @@ async function ensureSrcHtml(){
   }catch(e){}
   return window._SRC_HTML || '';
 }
+/* ===== 新版本自检（主屏 PWA 缓存对策）=====
+   iOS 主屏图标会把 index.html 缓存成一个快照，服务器更新后从图标打开仍是旧版，普通刷新没用 ✗
+   方案：旁边放一个极小的 version.txt，启动时 no-store 拉取对比；发现新版就提示一键更新，
+   更新时跳到带时间戳的新 URL 强制绕过 PWA 缓存 ✓
+   ⚠️ 每次发布：version.txt 必须和 index.html 一起更新（bump-version.sh 会同步写它）。
+   失败一律静默 —— 离线/网络差时照常能用本地数据，绝不因为检测打断使用 ✓ */
+function currentAppVersion(){
+  const el = document.getElementById('ver-badge');
+  return el ? (el.textContent || '').trim().replace(/^v/i, '') : '';
+}
+async function checkAppUpdate(){
+  if(location.protocol === 'file:') return;         // 本地双击打开：无需检测
+  try{
+    const cur = currentAppVersion();
+    if(!cur) return;
+    const res = await fetch('version.txt?t=' + Date.now(), {cache:'no-store'});
+    if(!res || !res.ok) return;
+    const latest = (await res.text()).trim().replace(/^v/i, '');
+    if(!latest || latest === cur) return;
+    // 已按过更新（或本次就是新版本）就不再提示，避免循环
+    if(sessionStorage.getItem('appUpdateDismissed') === latest) return;
+    openModal(`<div class="modal small">
+      <div class="modal-head"><h2>发现新版本</h2><button type="button" class="icon-btn" onclick="closeModal()">${svg('i-x')}</button></div>
+      <div class="modal-body" style="font-size:13px;line-height:1.7">
+        当前版本 <b>v${esc(cur)}</b>，最新是 <b>v${esc(latest)}</b>。
+        <div class="muted" style="font-size:12px;margin-top:8px">更新只是重新加载页面，<b>数据不会丢失</b>。</div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="btn ghost eq" onclick="dismissAppUpdate('${escAttr(latest)}')">稍后</button>
+        <button type="button" class="btn primary eq" onclick="doAppUpdate('${escAttr(latest)}')">立即更新</button>
+      </div>
+    </div>`);
+  }catch(e){ /* 离线或读取失败：静默跳过，不影响离线使用 */ }
+}
+function dismissAppUpdate(latest){
+  try{ sessionStorage.setItem('appUpdateDismissed', latest); }catch(e){}
+  closeModal();
+}
+function doAppUpdate(latest){
+  try{ sessionStorage.setItem('appUpdateDismissed', latest); }catch(e){}
+  const u = new URL(location.href);
+  u.searchParams.set('_upd', String(Date.now()));   // 时间戳破 PWA 缓存
+  location.replace(u.toString());
+}
 async function boot(){
   watchDocScroll(false);   // 只清开机时 iOS 恢复的滚动位置，不打开守卫窗口
   loadTableQuery();
   render();
   bindPageDbl();
   try{ if(!localStorage.getItem(LS_KEY)) save(); }catch(e){}
+  checkAppUpdate();
 }
 boot();
 </script>
