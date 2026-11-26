@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-11-26.2</title>
+<title>轻量数据库 · v2026-11-26.3</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1034,7 +1034,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-11-26.2">v2026-11-26.2</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-11-26.3">v2026-11-26.3</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -2566,12 +2566,13 @@ function ovSelBar(){
       + '<button type="button" class="btn sm" onclick="ovSelMove()">' + svg('i-folder') + ' 移入文件夹</button>'
       + '<button type="button" class="btn sm" onclick="ovSelExport()">' + svg('i-share') + ' 导出</button>'
       + '<button type="button" class="btn sm danger" onclick="ovSelDelete()">' + svg('i-trash') + ' 删除</button>'
-      + '<button type="button" class="btn sm ghost" onclick="ovSelEnd()">取消</button>';
+      + '<button type="button" class="btn sm ghost ov-sel-cancel" onclick="ovSelEnd()">取消</button>';
     document.body.appendChild(b);
   }
   const n = b.querySelector('.n');
   if(n) n.textContent = '已选 ' + _ovSel.size + ' 项';
-  b.querySelectorAll('button').forEach(bt=>{ bt.disabled = _ovSel.size === 0; });
+  /* ⚠️ 「取消」必须永远可用 —— 0 选中时用户就想退出多选，禁掉它就没法取消了（真机 2026-11-26）✗ */
+  b.querySelectorAll('button').forEach(bt=>{ bt.disabled = _ovSel.size === 0 && !bt.classList.contains('ov-sel-cancel'); });
 }
 /* 移入文件夹：弹出文件夹列表（含"未分类" + 就地新建） */
 function ovSelMove(){
@@ -5706,7 +5707,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-11-26.2</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-11-26.3</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -12720,7 +12721,7 @@ function importJSON(){
           }
         }catch(e){}
         const d = csvToDb(txt, file.name);
-        if(d && d.tables && d.tables.length){ openImportDialog(d); }
+        if(d && d.tables && d.tables.length){ openImportDialog(d, file.name); }
         else toast('导入失败：CSV 为空或格式不正确');
         return;
       }
@@ -12737,7 +12738,7 @@ function importJSON(){
               xgroups: Array.isArray(d.xgroups) ? d.xgroups : [] };
       }
       if(!d || !Array.isArray(d.tables)){ toast('导入失败：缺少 tables 字段'); return; }
-      openImportDialog(d);
+      openImportDialog(d, file.name);
     };
     if(isCsv) reader.readAsArrayBuffer(file);
     else reader.readAsText(file);
@@ -12784,6 +12785,7 @@ function csvToDb(text, filename){
 }
 let importCandidates = [];
 let importAll = null;
+let importFileName = '';   // 当前导入文件的名字（多表导入时按它建文件夹）
 /* 导入前先让用户看清：**这个文件里的字段到底带不带属性**。
    为什么需要：用户报"导出的字段有设置属性，导入时属性丢失"（2026-10-23）。
    JSON 导出是原样带走全部属性的（`normalizeDb` 的白名单覆盖 required/unique/curSym/… ），
@@ -12807,8 +12809,9 @@ function importAttrSummary(t){
   if(fs.some(f=>f.hidden)) parts.push(cnt('hidden') + ' 个隐藏字段');
   return parts.length ? ('含 ' + parts.join(' · ')) : '无属性（只有列名和值，多半是 CSV）';
 }
-function openImportDialog(d){
+function openImportDialog(d, fileName){
   importAll = d;
+  importFileName = String(fileName || '');
   importCandidates = (Array.isArray(d.tables) ? d.tables : []).filter(t=>t && typeof t==='object' && t.name!=null);
   if(!importCandidates.length){ toast('导入失败：文件中没有数据表'); return; }
   openModal(`<div class="modal small">
@@ -12868,6 +12871,25 @@ function doImportSelected(){
     }
     folderMap.set(String(f.id), ex.id);
   });
+  /* 多表导入：按**导入文件名**建一个文件夹，把这次导入的表全放进去（真机 2026-11-26 用户要求）。
+     文件名去掉 .json/.csv 后缀、过滤非法字符；同名文件夹已存在就复用，不重复建 ✗
+     单表导入不建（原来落哪就落哪），避免凭空多个空文件夹。 */
+  let importFolderId = '';
+  let importFolderName = '';
+  if(list.length > 1 && importFileName){
+    let nm = importFileName.replace(/\.(json|csv)$/i, '').trim();
+    nm = safeFileBase(nm);
+    if(nm && nm !== '数据表'){
+      let ex = db.folders.find(x=>String(x.name) === nm);
+      if(!ex){
+        const order = db.folders.reduce((m,x)=>Math.max(m, Number(x.order)||0), -1) + 1;
+        ex = { id: uid(), name: nm, order };
+        db.folders.push(ex);
+      }
+      importFolderId = ex.id;
+      importFolderName = nm;
+    }
+  }
   list.forEach(t=>{
     let name = String(t.name||'未命名表');
     if(existing.has(name)){ let k=2; while(existing.has(name+'('+k+')')) k++; name = name+'('+k+')'; }
@@ -12888,6 +12910,8 @@ function doImportSelected(){
     });
     // 文件夹归属：按导入文件里的 folderId 映射到（可能新建的）目标文件夹
     if(t.folderId && folderMap.has(String(t.folderId))) nt.folderId = folderMap.get(String(t.folderId));
+    // 多表导入优先归入「按文件名建的文件夹」（覆盖上面的原归属）
+    if(importFolderId) nt.folderId = importFolderId;
     db.tables.push(nt);
     added.push(name);
     if(t.id) idMap.set(String(t.id), nt.id);
@@ -12984,6 +13008,7 @@ function doImportSelected(){
   ui.tableQuery = {};
   save(); render();
   toast('已导入 '+added.length+' 张数据表'+(added.length>1 ? '' : '：「'+added[0]+'」')
+        + (importFolderName ? '，已放入文件夹「'+importFolderName+'」' : '')
         + (xgAdded ? '，含 '+xgAdded+' 个关联分组' : '')
         + (famAdded ? '，含 '+famAdded+' 个家庭关系' : '')
         + (xgDropped ? '；另有 '+xgDropped+' 条跨表成员因缺少对应数据表未导入' : ''));
