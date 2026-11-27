@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-11-26.3</title>
+<title>轻量数据库 · v2026-11-27.1</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -1034,7 +1034,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-11-26.3">v2026-11-26.3</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-11-27.1">v2026-11-27.1</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -2853,6 +2853,7 @@ function showOverviewMenu(x, y, scope){
     t.textContent = scopeName() + ' · 仅此文件夹';
     menu.appendChild(t);
     if(isRealFolder()) addRow('修改文件夹名称', false, ()=>{ closeOvMenu(); openRenameFolder(scope); });
+    if(isRealFolder()) addRow('删除文件夹', false, ()=>{ closeOvMenu(); deleteFolder(scope); });
     if(isRealFolder()) addRow('分享 / 导出此文件夹', false, ()=>{
       closeOvMenu();
       openExportChoice(bookExpand(folderTables(scope)), scopeName(), '文件夹「' + scopeName() + '」');
@@ -3668,12 +3669,50 @@ function renameFolder(folderId){
 function deleteFolder(folderId){
   const f = db.folders.find(x=>x.id===folderId); if(!f) return;
   const n = db.tables.filter(t=>t.folderId===folderId).length;
-  confirmDialog(`确定删除文件夹「${esc(f.name)}」吗？其中 ${n} 张数据表将移动到「未分类」。`, ()=>{
+  openModal(`<div class="modal small">
+    <div class="modal-head"><h2>删除文件夹</h2><button type="button" class="icon-btn" onclick="closeModal()" title="关闭">${svg('i-x')}</button></div>
+    <div class="modal-body">
+      <p>删除文件夹「${esc(f.name)}」？里面有 <b>${n}</b> 张数据表，请选择处理方式：</p>
+      <p class="muted" style="font-size:12px">选「删除文件夹和里面的表」时，表会进入回收站，可随时恢复。</p>
+    </div>
+    <div class="modal-foot">
+      <button type="button" class="btn ghost" onclick="closeModal()">取消</button>
+      <span class="flex1"></span>
+      <button type="button" class="btn ghost" onclick="deleteFolderOnly('${f.id}')">只删除文件夹</button>
+      <button type="button" class="btn danger" onclick="deleteFolderWithTables('${f.id}')">${svg('i-trash')} 删除文件夹和里面的表</button>
+    </div>
+  </div>`);
+}
+/* 只删文件夹：里面的表移到未分类，表本身不动 */
+function deleteFolderOnly(folderId){
+  if(!db.folders.some(x=>x.id===folderId)) return;
+  db.folders = db.folders.filter(x=>x.id!==folderId);
+  db.tables.forEach(t=>{ if(t.folderId===folderId) t.folderId = null; });
+  finishFolderDelete(folderId, '已删除文件夹，里面的表移到「未分类」');
+}
+/* 连表一起删：整表进回收站（可恢复），不彻底消失 */
+function deleteFolderWithTables(folderId){
+  const tbls = db.tables.filter(t=>t.folderId===folderId);
+  if(!tbls.length){ deleteFolderOnly(folderId); return; }
+  confirmDialog(`确定把文件夹里的 <b>${tbls.length}</b> 张数据表一起删除吗？<br>`
+    + '<span class="muted" style="font-size:12px">整表进入回收站，可随时恢复</span>', ()=>{
+    db.trash = db.trash || [];
+    tbls.forEach(x=>{
+      db.trash.push({ id: uid(), tableId: x.id, tableName: x.name, deletedAt: Date.now(),
+        rows: x.rows, fields: x.fields, view: x.view || {}, folderId: x.folderId || null, bookId: x.bookId || '' });
+      delete ui.tableQuery[x.id];
+    });
+    const gone = new Set(tbls.map(x=>x.id));
+    db.tables = db.tables.filter(x=>!gone.has(x.id));
     db.folders = db.folders.filter(x=>x.id!==folderId);
-    db.tables.forEach(t=>{ if(t.folderId===folderId) t.folderId = null; });
-    save(); closeModal(); render();
-    toast('已删除文件夹');
-  });
+    finishFolderDelete(folderId, '已删除文件夹和里面的 '+tbls.length+' 张表，可到回收站恢复');
+  }, '删除文件夹和里面的表');
+}
+function finishFolderDelete(folderId, msg){
+  // 正在该文件夹视图里删除时，hash 会悬空指向已删的 id —— 退回概览
+  if(location.hash.indexOf('#/folder/'+folderId)===0) location.hash = '#/overview';
+  save(); closeModal(); render();
+  toast(msg);
 }
 
 /* ===== 表格视图 ===== */
@@ -5707,7 +5746,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-11-26.3</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-11-27.1</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
