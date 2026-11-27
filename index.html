@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-11-27.1</title>
+<title>轻量数据库 · v2026-11-27.2</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -210,12 +210,12 @@ nav{padding:4px 10px}
    为什么要它：概览的拖动是 HTML5 拖放（draggable + ondragstart/ondrop），
    这套在**触屏上根本不触发** —— 安卓/iPad 上长按卡片拖不进文件夹（真机 2026-10-20）。
    多选不依赖拖放，所以手机上也能把表放进文件夹 ✓ */
-.ov-card.ov-sel{position:relative;padding-left:36px;cursor:pointer}
-.ov-card .ov-cb{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:18px;height:18px;
+.ov-card.ov-sel,.ov-row.ov-sel{position:relative;padding-left:36px;cursor:pointer}
+.ov-card .ov-cb,.ov-row .ov-cb{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:18px;height:18px;
   border:1.5px solid var(--line2);border-radius:5px;background:var(--panel);display:flex;align-items:center;
   justify-content:center;font-size:11px;line-height:1;color:transparent;font-weight:700}
-.ov-card.ov-sel.on{border-color:var(--accent);background:var(--accent-soft)}
-.ov-card.ov-sel.on .ov-cb{background:var(--accent);border-color:var(--accent);color:#fff}
+.ov-card.ov-sel.on,.ov-row.ov-sel.on{border-color:var(--accent);background:var(--accent-soft)}
+.ov-card.ov-sel.on .ov-cb,.ov-row.ov-sel.on .ov-cb{background:var(--accent);border-color:var(--accent);color:#fff}
 .ov-selbar{position:fixed;left:0;right:0;bottom:0;z-index:60;display:flex;align-items:center;gap:8px;
   padding:10px 12px calc(10px + env(safe-area-inset-bottom, 0px));background:var(--panel);
   border-top:1px solid var(--line);box-shadow:0 -4px 18px rgba(15,23,42,.10)}
@@ -1034,7 +1034,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-11-27.1">v2026-11-27.1</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-11-27.2">v2026-11-27.2</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -2153,7 +2153,11 @@ function fmtShortDate(ts){
 }
 function ovRowHTML(t){
   const sheets = bookSheets(t);
-  return `<a class="ov-row" href="#/table/${encodeURIComponent(t.id)}" data-id="${t.id}" draggable="true" ondragstart="dragTableStart(this,event)" ondragover="dragTableOver(this,event)" ondragleave="dragTableLeave(this)" ondrop="dragTableDrop(this,event,'${t.id}')" ondragend="dragTableEnd()" title="点击进入 · 拖动调整顺序 · 长按改名">
+  // 列表视图也要支持多选：和卡片一样带 ov-sel/on class、勾选框、点击切换，
+  // 否则列表模式下点「选择」看不到复选框，点行还会直接跳进表格 ✗
+  const sel = !!(_ovSel && _ovSel.has(t.id));
+  return `<a class="ov-row${_ovSel?' ov-sel':''}${sel?' on':''}" href="#/table/${encodeURIComponent(t.id)}" data-id="${t.id}" draggable="${_ovSel?'false':'true'}" ondragstart="dragTableStart(this,event)" ondragover="dragTableOver(this,event)" ondragleave="dragTableLeave(this)" ondrop="dragTableDrop(this,event,'${t.id}')" ondragend="dragTableEnd()" onclick="return ovSelClick(event,this)" title="${_ovSel?'点击选中 / 再点取消':'点击进入 · 拖动调整顺序 · 长按改名'}">
+    ${_ovSel?'<span class="ov-cb">✓</span>':''}
     <span class="ov-row-ic">${svg('i-table')}</span>
     <span class="ov-row-name">${esc(bookNameOf(t))}</span>
     <span class="ov-row-meta">${t.rows.length} 条${sheets.length>1?' · '+sheets.length+' 个工作表':''}</span>
@@ -5746,7 +5750,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-11-27.1</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-11-27.2</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
