@@ -41,6 +41,7 @@ select{padding:6px;border:1px solid #ccc;border-radius:6px;font-size:14px}
   <div class="row">
     <button class="btn" id="btnCam" onclick="document.getElementById('cam').click()">拍照</button>
     <button class="btn ghost" id="btnGal" onclick="document.getElementById('gal').click()">从相册选</button>
+    <button class="btn ghost" onclick="selfTest()">连接自检</button>
     <input type="file" id="cam" accept="image/*" capture="environment">
     <input type="file" id="gal" accept="image/*">
   </div>
@@ -119,19 +120,20 @@ function dataUrlBytes(u){
 }
 function compress(file){
   document.getElementById('status').textContent = '正在压缩图片…';
-  return readFile(file).then(loadImg).then(function(img){
-    var maxDim = 1600;
+  var src;
+  return readFile(file).then(function(d){ src = d; return loadImg(d); }).then(function(img){
+    var maxDim = 1400;
     var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
     var w = Math.max(1, Math.round(img.width * scale));
     var h = Math.max(1, Math.round(img.height * scale));
-    var q = 0.85, out;
-    for(var k=0;k<20;k++){
+    var q = 0.82, out;
+    for(var k=0;k<24;k++){
       var c = document.createElement('canvas');
       c.width = w; c.height = h;
       c.getContext('2d').drawImage(img,0,0,w,h);
       out = c.toDataURL('image/jpeg', q);
-      if(dataUrlBytes(out) <= 950*1024) break;
-      if(q > 0.45) q -= 0.1;
+      if(dataUrlBytes(out) <= 900*1024) break;
+      if(q > 0.4) q -= 0.08;
       else { w = Math.round(w*0.8); h = Math.round(h*0.8); }
     }
     curDataUrl = out;
@@ -140,6 +142,8 @@ function compress(file){
       '原图 ' + img.width + '×' + img.height + ' / ' + Math.round(file.size/1024) + 'KB  →  压缩后 ' +
       w + '×' + h + ' / ' + Math.round(dataUrlBytes(out)/1024) + 'KB';
     return out;
+  }).catch(function(e){
+    throw new Error('图片解码失败（可能是 HEIC 格式）。请到相册里把照片转成 JPG，或换一张照片重试。详情：' + (e && e.message || e));
   });
 }
 function handleFile(file){
@@ -158,23 +162,65 @@ function recognize(){
   var lang = document.getElementById('lang').value;
   var engine = document.getElementById('engine').value;
   document.getElementById('status').textContent = '正在识别（' + lang + ' / Engine ' + engine + '）…';
+  document.getElementById('msg').innerHTML = '';
   var fd = new FormData();
   fd.append('base64Image', curDataUrl);
   fd.append('language', lang);
   fd.append('OCREngine', engine);
   fd.append('isOverlayRequired', 'true');
   fd.append('scale', 'true');
+  var ctrl = new AbortController();
+  var timer = setTimeout(function(){ ctrl.abort(); }, 45000);
   fetch('https://api.ocr.space/parse/image',{
     method:'POST',
     headers:{'apikey':'helloworld'},
-    body:fd
-  }).then(function(r){return r.json();}).then(function(d){
+    body:fd,
+    signal:ctrl.signal
+  }).then(function(r){
+    clearTimeout(timer);
+    if(!r.ok) throw new Error('HTTP ' + r.status + ' ' + r.statusText);
+    return r.json();
+  }).then(function(d){
     document.getElementById('status').textContent = '识别完成';
     showResult(d);
   }).catch(function(e){
-    document.getElementById('status').textContent = '请求失败：' + (e && e.message || e);
-    document.getElementById('msg').innerHTML = '<div class="err">可能是网络不通、公共 key 限流，或服务暂时不可用。稍后再试。</div>';
+    clearTimeout(timer);
+    var msg = (e && e.name === 'AbortError') ? '请求超时（45 秒）' : (e && e.message || String(e));
+    document.getElementById('status').textContent = '请求失败：' + msg;
+    var hint = (e && e.name === 'AbortError')
+      ? '手机到 ocr.space 的连接太慢或被拦截。先点上面的「连接自检」看看通不通。'
+      : '通常是网络问题：手机连不上 ocr.space（国外服务，国内有时不稳）。先点「连接自检」；换 WiFi/流量再试。';
+    document.getElementById('msg').innerHTML = '<div class="err">' + hint + '</div>';
   });
+}
+
+function selfTest(){
+  var s = document.getElementById('status');
+  s.textContent = '连接自检中…';
+  document.getElementById('msg').innerHTML = '';
+  var ctrl = new AbortController();
+  var timer = setTimeout(function(){ ctrl.abort(); }, 20000);
+  var t0 = Date.now();
+  fetch('https://api.ocr.space/parse/imageurl?apikey=helloworld&url=' +
+        encodeURIComponent('https://dl.a9t9.com/ocr/solarcell.jpg') + '&language=auto&OCREngine=2',
+        { signal:ctrl.signal })
+    .then(function(r){ clearTimeout(timer); return r.json().then(function(d){ return {ok:r.ok, d:d}; }); })
+    .then(function(x){
+      var ms = Date.now() - t0;
+      if(x.d && typeof x.d.OCRExitCode !== 'undefined'){
+        s.textContent = '连接正常（' + ms + 'ms，服务可用）';
+        document.getElementById('msg').innerHTML = '<div class="ok">网络通、服务可用。如果拍照仍失败，问题在照片本身（格式/大小）。</div>';
+      } else {
+        s.textContent = '连接异常';
+        document.getElementById('msg').innerHTML = '<div class="err">服务返回异常：' + JSON.stringify(x.d).slice(0,300) + '</div>';
+      }
+    })
+    .catch(function(e){
+      clearTimeout(timer);
+      var msg = (e && e.name === 'AbortError') ? '20 秒内没连上（超时）' : (e && e.message || String(e));
+      s.textContent = '连接自检失败：' + msg;
+      document.getElementById('msg').innerHTML = '<div class="err">手机连不上 ocr.space。换网络（WiFi/4G/5G）再试；若一直不行，说明这个免费服务在当前网络不可用。</div>';
+    });
 }
 
 function showResult(d){
