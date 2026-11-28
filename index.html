@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=overlays-content">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" id="theme-color-meta" content="#F5F6F8">
-<title>轻量数据库 · v2026-11-27.2</title>
+<title>轻量数据库 · v2026-11-28.1</title>
 <!-- iOS「添加到主屏幕」后按 App 方式打开：全屏、没有 Safari 地址栏。
      图标必须用 PNG（iOS 不认 SVG，也不认 data: 的 SVG），这里内嵌成 base64 保持单文件。 -->
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -770,7 +770,8 @@ input.in.err:focus{box-shadow:0 0 0 3px rgba(229,97,91,.12)!important}
 #dialog-opt-list{max-height:300px;min-height:100px;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .opt-more{align-self:flex-start;font-size:12px;color:var(--accent);background:none;border:none;cursor:pointer;padding:2px 0;line-height:1.4}
 .opt-chip{display:inline-flex;align-items:center;gap:3px;background:var(--panel2);border:1px solid var(--line2);border-radius:20px;padding:2px 5px;font-size:12px;color:var(--text);cursor:grab}
-.opt-chip.dragging{opacity:.45}
+.opt-chip.dragging{opacity:.45;background:var(--accent-soft)}
+.opt-chip.drag-armed{outline:2px dashed var(--accent);outline-offset:1px}
 .opt-chip.drop-target{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
 .opt-del{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border:none;background:transparent;color:var(--muted);cursor:pointer;border-radius:50%;padding:0;flex:none}
 .opt-del:hover{color:var(--danger-hi);background:rgba(229,97,91,.15)}
@@ -1034,7 +1035,7 @@ html,body{overscroll-behavior-y:none}
 <aside id="sidebar">
   <div class="side-brand">
     <span class="brand-mark"><svg class="ic big" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg></span>
-    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-11-27.2">v2026-11-27.2</span></div></div>
+    <div><div class="brand-name">轻量数据库</div><div class="brand-sub">Local DB <span class="ver-badge" id="ver-badge" title="本文件版本：2026-11-28.1">v2026-11-28.1</span></div></div>
     <button class="icon-btn close-side" onclick="toggleSide(false)" title="关闭菜单" aria-label="关闭菜单"><svg class="ic" aria-hidden="true"><use href="#i-x" xlink:href="#i-x"/></svg></button>
   </div>
   <nav><a class="nav-item" href="#/overview" id="nav-overview"><svg class="ic" aria-hidden="true"><use href="#i-db" xlink:href="#i-db"/></svg>概览</a>
@@ -5750,7 +5751,7 @@ function openHelp(){
     '<p style="margin:4px 0;font-size:13px">• <b>日期</b>：输入"二月十六"或"2月16日"自动填日期</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>数字</b>：优先取"字段名+数字"（如"价格50"），最后一次为准</p>'+
     '<p style="margin:4px 0;font-size:13px">• <b>备注</b>：取"备注"后面的内容，到下一个字段名或分隔符为止</p>'+
-    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-11-27.2</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
+    '<p style="margin:14px 0 0;font-size:12px;color:var(--muted);border-top:1px solid var(--line);padding-top:10px">当前版本：<b id="help-ver">v2026-11-28.1</b>　（每次更新都会改这个号，方便对照自己用的是哪一版）</p>'+
     '</div>'+
     '<div class="modal-foot"><button class="btn primary eq" onclick="closeModal()">知道了</button></div>'+
     '</div>';
@@ -11625,6 +11626,90 @@ function toggleOptDefault(btn){
   try{ opts = JSON.parse(store.value)||[]; }catch(e){}
   list.innerHTML = opts.map(o=>optChip(o, defs)).join('');
 }
+/* 选项列表对应的 field-row：弹窗 (#dialog-opt-list) 用 _currentOptRow，
+   字段行里的内联 .opt-list 用祖先 .opt-editor —— 原 dropChip 只认 opt-editor，
+   导致「多选值设置」弹窗里连鼠标拖动都不生效 ✗ */
+function optListRow(list){
+  if(!list) return null;
+  if(list.id==='dialog-opt-list' && window._currentOptRow) return window._currentOptRow;
+  const ed = list.closest('.opt-editor');
+  return ed ? ed.closest('.field-row') : null;
+}
+/* 选项即时落库（和 addOptionFromDialog 一致，不等保存储） */
+function persistOptOptions(row, opts){
+  const tid = optDialogTableId(), fid = row && row.dataset.fid;
+  if(!tid || !fid) return;
+  const t = db.tables.find(x=>x.id===tid);
+  const f = t && t.fields.find(x=>x.id===fid);
+  if(f){ f.options = opts; save(); }
+}
+/* 按 DOM 顺序把选项写回 store + db；返回是否真的变了 */
+function commitOptOrder(list){
+  const row = optListRow(list); if(!row) return false;
+  const store = row.querySelector('.opt-store'); if(!store) return false;
+  const opts = [...list.querySelectorAll('.opt-chip')].map(x=>x.dataset.value);
+  let old = []; try{ old = JSON.parse(store.value)||[]; }catch(e){}
+  if(opts.join('\u0001') === old.join('\u0001')) return false;
+  store.value = JSON.stringify(opts);
+  persistOptOptions(row, opts);
+  return true;
+}
+/* 多选值长按拖动排序（触屏）：HTML5 拖放在手机上完全不触发，必须自己用 touch 事件。
+   长按 420ms 才进入拖动，短按 / 快速滑动仍交给浏览器滚动；
+   ⚠️ touchmove 必须 passive:false + preventDefault，否则被判成滚动、手势被掐断 ✗ */
+let _optTouch = null;
+document.addEventListener('touchstart', e=>{
+  if(e.target.closest('button')) return;              // 星标 / 删除按钮不触发拖动
+  const chip = e.target.closest('.opt-chip'); if(!chip) return;
+  const list = chip.closest('.opt-list'); if(!list) return;
+  if(_optTouch) _optTouch.cancel();
+  const p = e.touches[0]; if(!p) return;
+  const sx = p.clientX, sy = p.clientY;
+  let timer = setTimeout(()=>{ timer = null; armed = true; chip.classList.add('drag-armed'); }, 420);
+  let armed = false, dragging = false;
+  const cleanup = ()=>{
+    clearTimeout(timer);
+    chip.classList.remove('drag-armed','dragging');
+    document.removeEventListener('touchmove', move);
+    document.removeEventListener('touchend', end);
+    document.removeEventListener('touchcancel', end);
+    if(_optTouch && _optTouch.cancel === cancel) _optTouch = null;
+  };
+  const cancel = ()=>cleanup();
+  const move = ev=>{
+    const q = ev.touches[0]; if(!q) return;
+    if(timer){
+      // 手指明显移动 = 用户想滚动列表，取消长按
+      if(Math.abs(q.clientX-sx)>10 || Math.abs(q.clientY-sy)>10){ clearTimeout(timer); timer=null; cleanup(); }
+      return;
+    }
+    if(!armed) return;
+    if(!dragging){
+      if(Math.abs(q.clientX-sx)<10 && Math.abs(q.clientY-sy)<10) return;
+      dragging = true; chip.classList.add('dragging'); chip.classList.remove('drag-armed');
+    }
+    ev.preventDefault();
+    const rest = [...list.querySelectorAll('.opt-chip')].filter(x=>x!==chip);
+    // .opt-list 是 flex-wrap：一行多个 chip，同行要看横向位置，换行才看纵向 ✗ 只看 Y 会拖不动
+    const before = rest.find(x=>{
+      const r = x.getBoundingClientRect();
+      const cy = r.top + r.height/2;
+      if(Math.abs(q.clientY - cy) < r.height/2 + 2) return q.clientX < r.left + r.width/2;
+      return q.clientY < cy;
+    });
+    if(before){ if(chip.nextElementSibling !== before) list.insertBefore(chip, before); }
+    else if(list.lastElementSibling !== chip) list.appendChild(chip);
+  };
+  const end = ()=>{
+    const was = dragging; cleanup();
+    if(was && commitOptOrder(list)) toast('多选值顺序已保存');
+  };
+  _optTouch = { cancel };
+  document.addEventListener('touchmove', move, {passive:false});
+  document.addEventListener('touchend', end);
+  document.addEventListener('touchcancel', end);
+}, {passive:true});
+
 let dragChip = null;
 function dragStartChip(el, ev){
   dragChip = el;
@@ -11640,8 +11725,9 @@ function dragLeaveChip(el){ el.classList.remove('drop-target'); }
 function dropChip(el, ev){
   if(ev && ev.preventDefault) ev.preventDefault();
   if(!dragChip || dragChip===el) return;
-  const editor = el.closest('.opt-editor');
-  const store = editor.querySelector('.opt-store');
+  const list = el.closest('.opt-list'); if(!list) return;
+  const row = optListRow(list); if(!row) return;
+  const store = row.querySelector('.opt-store');
   let opts = [];
   try{ opts = JSON.parse(store.value)||[]; }catch(e){}
   const from = opts.indexOf(dragChip.dataset.value);
@@ -11650,8 +11736,11 @@ function dropChip(el, ev){
   const moved = opts.splice(from,1)[0];
   opts.splice(to,0,moved);
   store.value = JSON.stringify(opts);
-  editor.querySelector('.opt-list').innerHTML = opts.map(o=>optChip(o, optDefs(editor))).join('');
-  syncOptClear(editor);
+  let defs = [];
+  try{ const ds = row.querySelector('.opt-def-store'); defs = ds ? (JSON.parse(ds.value)||[]) : []; }catch(e){}
+  list.innerHTML = opts.map(o=>optChip(o, defs)).join('');
+  const editor = list.closest('.opt-editor'); if(editor) syncOptClear(editor);
+  persistOptOptions(row, opts);
   dragChip = null;
 }
 function dragEndChip(){
@@ -11782,6 +11871,8 @@ function addOptionFromDialog(btn){
   const store = row.querySelector('.opt-store');
   let opts = [];
   try{ opts = JSON.parse(store.value)||[]; }catch(e){}
+  // 多选值最多 6 个：第 7 个一律加不进去，提示后原样保留（已有数据超过 6 个也不删，避免破坏旧表）
+  if(opts.length >= 6){ toast('已添加多选择'); input.value = ''; input.focus(); return; }
   opts.push(input.value.trim());
   store.value = JSON.stringify(opts);
   input.value = '';
